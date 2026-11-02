@@ -1,0 +1,109 @@
+/*
+  Ember Low: reset, type, page chrome, focus and buttons.
+  Tokens come from tokens.css (copied unchanged from design/tokens.css).
+*/
+
+/* ---------- Reset ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+  overflow-x: clip;               /* belt and braces: the callouts reach slightly outside the shoe box */
+}
+h1, h2, h3, p, ol, ul, dl, dd, figure, fieldset { margin: 0; padding: 0; }
+ol, ul { list-style: none; }
+img, svg { display: block; }
+a { color: inherit; }
+button, input { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+
+/* Smooth in-page jumps (Skip to buy, step links) only when motion is welcome. */
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+
+/* ---------- Focus ---------- */
+:focus-visible {
+  outline: var(--focus-width) solid var(--color-focus);
+  outline-offset: var(--focus-offset);
+}
+:focus:not(:focus-visible) { outline: none; }
+main:focus { outline: none; }   /* skip-link target only; it is not an interactive control */
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+
+/* The shared <defs> sprite: present for <use>/gradient references, never painted. */
+.svg-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* ---------- Skip links ---------- */
+.skip-link {
+  position: absolute; left: var(--space-2); top: var(--space-2); z-index: 10;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-raised); color: var(--color-text);
+  border-radius: var(--radius-control);
+  font-weight: var(--font-weight-strong);
+  transform: translateY(-200%);
+}
+.skip-link:focus-visible { transform: none; }
+
+/* ---------- Display type ---------- */
+.display {
+  font-family: var(--font-display);
+  font-stretch: var(--font-display-stretch);
+  font-weight: var(--font-weight-display);
+  letter-spacing: var(--tracking-display);
+  line-height: var(--leading-tight);
+}
+
+/* ---------- Top bar ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 5;
+  height: var(--bar-height);
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
+  padding-inline: var(--space-gutter);
+  background: var(--color-surface);
+}
+.wordmark {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  min-height: var(--target-min);
+  text-decoration: none;
+  font-family: var(--font-display); font-stretch: var(--font-display-stretch);
+  font-weight: var(--font-weight-display); font-size: var(--text-lg); letter-spacing: 0;
+  border-radius: var(--radius-control);
+}
+.wordmark svg { width: 2.25rem; height: auto; }
+.topbar__buy {
+  display: inline-flex; align-items: center; min-height: var(--target-min);
+  padding-inline: var(--space-4);
+  border: 2px solid var(--color-primary); border-radius: var(--radius-control);
+  color: var(--color-primary); font-weight: var(--font-weight-strong); text-decoration: none;
+}
+.topbar__buy:hover { background: var(--color-primary); color: var(--color-on-primary); }
+
+/* ---------- Buttons ---------- */
+.btn-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  min-height: 3.25rem; padding-inline: var(--space-5); width: 100%;
+  border: 0; border-radius: var(--radius-control);
+  background: var(--color-primary); color: var(--color-on-primary);
+  font-weight: var(--font-weight-strong); font-size: var(--text-md); cursor: pointer;
+}
+.btn-primary:hover { background: var(--color-primary-hover); }
+.btn-primary:active { transform: translateY(1px); }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Colour changes on hover are instant; only the press nudge is transitioned (transform only). */
+  .btn-primary { transition: transform var(--duration-quick) var(--ease-out); }
+}
+
+/* ---------- Icons ---------- */
+.icon { width: 1.25rem; height: 1.25rem; flex: none; }

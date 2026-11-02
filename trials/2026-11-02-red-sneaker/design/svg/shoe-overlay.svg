@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 312 148" overflow="visible" aria-hidden="true" focusable="false" class="shoe-overlay">
+  <!--
+    Ember Low build overlay. Coordinates are V1-local: the side view in the sheet,
+    sheet box x 36..348, y 32..180 (312 x 148). Sits exactly on top of the layer box.
+    Everything here is decorative (aria-hidden). Every stroked path has pathLength="1",
+    so CSS can draw it with stroke-dasharray: 1; stroke-dashoffset: 1 -> 0.
+    Callouts reach outside the viewBox (x -15..326, y -24..174): keep overflow visible.
+    Default state in this file = everything shown, so it doubles as a reference sheet.
+    Style hooks are classes (ids can repeat when the static list shows five copies:
+    suffix the two ids, outline-reveal and outline-reveal-path, per copy).
+  -->
+  <defs>
+    <!-- The cut line is dashed, so it is revealed through a mask: animate stroke-dashoffset
+         of .outline-reveal-path (1 = hidden, 0 = fully drawn). -->
+    <mask id="outline-reveal" maskUnits="userSpaceOnUse" x="-12" y="-12" width="336" height="172">
+      <path id="outline-reveal-path" class="outline-reveal-path" pathLength="1" fill="none" stroke="#fff" stroke-width="8" stroke-linejoin="round"
+        d="M3.5,110 L3.5,100 L4,88 L5.7,75 L8.6,62.5 L13.2,50.3 L18,44.3 L22.8,47.2 L28.8,52.7 L34.6,56.6 L40.3,58.5 L50,59.5 L60,59.5 L67.6,58 L74.3,55.7 L81,51.3 L85.8,47 L89.6,41.3 L92.5,35.6 L94,28.8 L94.5,20 L95.6,11.5 L99,4.8 L102.8,2 L106.4,1.9 L109.3,4.2 L119.3,11.5 L131.6,18.2 L154,31.4 L174.6,44.4 L193.6,53.8 L212,64.6 L230.4,72.1 L241.3,74.5 L250.2,75.9 L260.4,77.2 L267,75.7 L276.2,75.7 L286.5,77.2 L295.4,80.9 L302.8,88.5 L307.5,97.6 L309.7,104.8 L310.8,113.5 L310.4,117.2 L308.6,120.6 L300.5,124.4 L290.4,128 L270.4,133.8 L250.3,138.1 L230.2,141 L190.1,144.7 L150,146.8 L100,146.9 L50,146.1 L19.7,144.7 L9.3,143.1 L5.7,140.5 L3,135.3 L2.3,129 L2.3,118 L2.8,112 Z"/>
+    </mask>
+  </defs>
+
+  <!-- 1. Cut line: dashed silhouette of the assembled shoe, about 1.5 units outside the edge. -->
+  <g id="outline" class="outline" mask="url(#outline-reveal)">
+    <path class="outline-path" fill="none" stroke="#6E6566" stroke-width="1" stroke-dasharray="3.2 2.4" stroke-linejoin="round"
+      d="M3.5,110 L3.5,100 L4,88 L5.7,75 L8.6,62.5 L13.2,50.3 L18,44.3 L22.8,47.2 L28.8,52.7 L34.6,56.6 L40.3,58.5 L50,59.5 L60,59.5 L67.6,58 L74.3,55.7 L81,51.3 L85.8,47 L89.6,41.3 L92.5,35.6 L94,28.8 L94.5,20 L95.6,11.5 L99,4.8 L102.8,2 L106.4,1.9 L109.3,4.2 L119.3,11.5 L131.6,18.2 L154,31.4 L174.6,44.4 L193.6,53.8 L212,64.6 L230.4,72.1 L241.3,74.5 L250.2,75.9 L260.4,77.2 L267,75.7 L276.2,75.7 L286.5,77.2 L295.4,80.9 L302.8,88.5 L307.5,97.6 L309.7,104.8 L310.8,113.5 L310.4,117.2 L308.6,120.6 L300.5,124.4 L290.4,128 L270.4,133.8 L250.3,138.1 L230.2,141 L190.1,144.7 L150,146.8 L100,146.9 L50,146.1 L19.7,144.7 L9.3,143.1 L5.7,140.5 L3,135.3 L2.3,129 L2.3,118 L2.8,112 Z"/>
+  </g>
+
+  <!-- 2. Stitch traces: thread colour over the real stitching of the upper. -->
+  <g id="stitches" class="stitches" fill="none" stroke="#F7F5F1" stroke-width="1.1" stroke-linecap="round">
+    <path class="stitch stitch--collar" pathLength="1" d="M20.5,51.5 C27,58.5 36,63.5 47,64.6 C58,65.6 70,64 78,58.5 C82.5,55.3 86,51.5 88.5,48"/>
+    <path class="stitch stitch--vamp" pathLength="1" d="M90,51.6 L176,74.4 L266,98.2"/>
+  </g>
+
+  <!-- 3. Eyelet rings, heel to toe. Centres measured on the V1 view. -->
+  <g id="eyelets" class="eyelets" fill="none" stroke="#F7F5F1" stroke-width="1.2">
+    <circle class="eyelet" pathLength="1" cx="111.1" cy="45" r="4.6"/>
+    <circle class="eyelet" pathLength="1" cx="134.3" cy="53.6" r="4.6"/>
+    <circle class="eyelet" pathLength="1" cx="157.9" cy="62.9" r="4.6"/>
+    <circle class="eyelet" pathLength="1" cx="181.4" cy="70.7" r="4.6"/>
+    <circle class="eyelet" pathLength="1" cx="206" cy="77.9" r="4.6"/>
+    <circle class="eyelet" pathLength="1" cx="231.4" cy="85.7" r="4.6"/>
+  </g>
+
+  <!-- 4. Part callouts: pin on the part, leader out to a numbered tag (the step number). -->
+  <g id="callouts" class="callouts" font-family="Bahnschrift, 'DIN Alternate', 'Roboto Condensed', 'Arial Narrow', sans-serif" font-weight="700" font-size="9" text-anchor="middle">
+    <g class="callout callout--sole">
+      <path class="callout-leader" pathLength="1" d="M70,129.5 L50,166" fill="none" stroke="#1F1A1B" stroke-width=".8"/>
+      <circle class="callout-pin" cx="70" cy="129.5" r="2" fill="#1F1A1B" stroke="#F7F5F1" stroke-width=".8"/>
+      <g class="callout-tag"><circle cx="50" cy="166" r="7" fill="#1F1A1B"/><text x="50" y="169.2" fill="#F7F5F1">1</text></g>
+    </g>
+    <g class="callout callout--toe">
+      <path class="callout-leader" pathLength="1" d="M292,100 L318,64" fill="none" stroke="#1F1A1B" stroke-width=".8"/>
+      <circle class="callout-pin" cx="292" cy="100" r="2" fill="#1F1A1B" stroke="#F7F5F1" stroke-width=".8"/>
+      <g class="callout-tag"><circle cx="318" cy="64" r="7" fill="#1F1A1B"/><text x="318" y="67.2" fill="#F7F5F1">2</text></g>
+    </g>
+    <g class="callout callout--upper">
+      <!-- Grainline: the pattern-maker's mark for the direction of the canvas weave. -->
+      <path class="grainline" pathLength="1" d="M24,98 H92 M28.5,95.2 L24,98 L28.5,100.8 M87.5,95.2 L92,98 L87.5,100.8" fill="none" stroke="#F7F5F1" stroke-width=".9" stroke-linecap="round" stroke-linejoin="round"/>
+      <path class="callout-leader" pathLength="1" d="M176,94 L212,32" fill="none" stroke="#1F1A1B" stroke-width=".8"/>
+      <circle class="callout-pin" cx="176" cy="94" r="2" fill="#1F1A1B" stroke="#F7F5F1" stroke-width=".8"/>
+      <g class="callout-tag"><circle cx="212" cy="32" r="7" fill="#1F1A1B"/><text x="212" y="35.2" fill="#F7F5F1">3</text></g>
+    </g>
+    <g class="callout callout--insole">
+      <!-- Pin sits on the insole while it hovers (insole centre at V1 52,24). -->
+      <path class="callout-leader" pathLength="1" d="M28,22 L-6,-10" fill="none" stroke="#1F1A1B" stroke-width=".8"/>
+      <circle class="callout-pin" cx="28" cy="22" r="2" fill="#1F1A1B" stroke="#F7F5F1" stroke-width=".8"/>
+      <g class="callout-tag"><circle cx="-6" cy="-10" r="7" fill="#1F1A1B"/><text x="-6" y="-6.8" fill="#F7F5F1">4</text></g>
+    </g>
+    <g class="callout callout--laces">
+      <path class="callout-leader" pathLength="1" d="M206,77.9 L246,32" fill="none" stroke="#1F1A1B" stroke-width=".8"/>
+      <circle class="callout-pin" cx="206" cy="77.9" r="2" fill="#1F1A1B" stroke="#F7F5F1" stroke-width=".8"/>
+      <g class="callout-tag"><circle cx="246" cy="32" r="7" fill="#1F1A1B"/><text x="246" y="35.2" fill="#F7F5F1">5</text></g>
+    </g>
+  </g>
+</svg>

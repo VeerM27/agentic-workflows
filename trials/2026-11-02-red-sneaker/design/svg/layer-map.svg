@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 660 560" font-family="system-ui, sans-serif" font-size="9">
+  <!--
+    Ember Low layer map. Source sheet: inputs/photos/red-sneaker.png, measured 612 x 551 px
+    (naturalWidth/naturalHeight read in the browser; the plan's 612 x 544 estimate was 7 px short).
+
+    V1 (side view) box in the sheet: x 36..348, y 32..180  ->  312 x 148, V1-local coordinates below.
+    Insole box in the sheet (from V3, top view): x 44..146, y 256..319  ->  102 x 63, insole-local coordinates.
+
+    Polygons are the source of truth for the CSS clip-paths. Shared edges use identical vertices,
+    so the five layers tile the shoe with no gaps. Panel B and row 2 render every layer on blue:
+    any white inside a polygon or any gap between polygons shows up as white or blue.
+  -->
+  <defs>
+    <!-- Seam rule: where two layers meet, the layer that arrives LATER runs 0.6 units over the
+         earlier one (same sheet pixels, so it is invisible when assembled). This stops
+         anti-aliased clip edges leaving a hairline, and never shows a sliver of a part that
+         has not arrived yet. Earlier layers stop 0.4 short of the true edge for the same reason. -->
+    <polygon id="poly-sole" points="3.6,125.5 224,122 309,116.5 307.5,119.5 300,123 290,126.5 270,132.3 250,136.6 230,139.5 190,143.2 150,145.3 100,145.6 50,144.8 20,143.3 10,141.8 7,139.6 4.5,135 3.8,129"/>
+    <polygon id="poly-sidewall-toe" points="3.6,126.1 3.8,118 4.3,112 5,109.6 10,110.8 20,110.8 80,111 150,110.8 200,108.8 220,106.5 240,103 255,100 269,97.4 262,78.9 267,77.2 276,77.2 286,78.7 294.5,82.2 301.5,89.3 306,98 308.2,105 309.3,113.5 309.1,117.1 224,122.6"/>
+    <polygon id="poly-upper" points="5,110.2 5,100 5.5,88 7.2,75 10,63 14.5,51 18.4,46.2 22,49.2 28,54.8 33,58.2 40,61 50,62.5 60,62.7 67,61.2 72,59.7 78,57.5 84,53.6 88,49.7 91.5,44.2 94,38 95.2,33.5 95.8,29 96,20 97,12 100,6 103,3.5 106,3.4 108.5,5.5 118.5,12.8 131,19.6 121,25.5 108,37 102.8,42 103,51.5 238,96 242,90 242.5,82 241,76 250,77.4 262.8,78.8 269.8,98 255,100.6 240,103.6 220,107.1 200,109.4 150,111.4 80,111.6 20,111.4 10,111.4"/>
+    <polygon id="poly-upper-fill" points="130.6,19 153.5,32.8 174,45.8 193,55.2 211.5,66 230,73.6 241.4,75.5 243.1,82 242.6,90.3 238.3,96.7 102.4,52 102.2,41.7 107.6,36.5 120.6,25"/>
+    <polygon id="poly-laces" points="102.4,52 102.2,41.7 107.6,36.5 120.6,25 130.6,19 139,17.6 144.5,20 148,27.5 153.5,32.8 160,33.2 165,36 168,41.5 174,45.8 181,44.8 186.5,48 189.5,54 193,55.2 200,54.8 205.5,58.5 208.5,65 211.5,66 219,66.2 224,69 226.5,72.8 230,73.6 235,71.6 239.5,73.5 241.4,75.5 243.1,82 242.6,90.3 238.3,96.7"/>
+    <polygon id="poly-insole" points="4.2,28 9,18.3 17.3,12 26.6,8.2 36.4,5.5 46.2,4 57.5,3.2 71.7,3.2 86,3.8 92,4.6 96.5,8 98.5,14 99,30 98.5,46 96.5,52 92,55.4 78.8,57.8 57.5,60 43.2,59.3 29.4,57.2 18.5,53.6 10.4,48.2 5.2,40.2"/>
+
+    <clipPath id="c-sole"><use href="#poly-sole"/></clipPath>
+    <clipPath id="c-sidewall-toe"><use href="#poly-sidewall-toe"/></clipPath>
+    <clipPath id="c-upper"><use href="#poly-upper"/></clipPath>
+    <clipPath id="c-laces"><use href="#poly-laces"/></clipPath>
+    <clipPath id="c-insole"><use href="#poly-insole"/></clipPath>
+    <clipPath id="c-v1"><rect width="312" height="148"/></clipPath>
+    <clipPath id="c-ins"><rect width="102" height="63"/></clipPath>
+
+    <!-- V1 crop and insole crop of the sheet -->
+    <image id="v1" href="../../inputs/photos/red-sneaker.png" x="-36" y="-32" width="612" height="551"/>
+    <image id="v3" href="../../inputs/photos/red-sneaker.png" x="-44" y="-256" width="612" height="551"/>
+  </defs>
+
+  <rect width="660" height="560" fill="#F7F5F1"/>
+
+  <!-- Row 1, panel A: V1 with labelled polygons -->
+  <text x="10" y="14" font-weight="700">A. V1 side view, polygons (V1-local units)</text>
+  <g transform="translate(10 22)">
+    <g clip-path="url(#c-v1)"><use href="#v1"/></g>
+    <rect width="312" height="148" fill="none" stroke="#6E6566" stroke-width=".5" stroke-dasharray="2 2"/>
+    <use href="#poly-sole" fill="#1f6fff" fill-opacity=".28" stroke="#1f6fff" stroke-width=".6"/>
+    <use href="#poly-sidewall-toe" fill="#00a37a" fill-opacity=".28" stroke="#00a37a" stroke-width=".6"/>
+    <use href="#poly-upper" fill="#ffb000" fill-opacity=".22" stroke="#b07a00" stroke-width=".6"/>
+    <use href="#poly-upper-fill" fill="#7a2cff" fill-opacity=".3" stroke="#7a2cff" stroke-width=".6"/>
+    <use href="#poly-laces" fill="none" stroke="#ff2fa8" stroke-width=".8" stroke-dasharray="2 1"/>
+    <g font-size="7" font-weight="700">
+      <text x="120" y="141" fill="#0b3fa8">sole</text>
+      <text x="40" y="119" fill="#006b50">sidewall-toe</text>
+      <text x="30" y="90" fill="#fff">upper</text>
+      <text x="150" y="62" fill="#fff" transform="rotate(20 150 62)">upper-fill / laces</text>
+    </g>
+  </g>
+
+  <!-- Row 1, panel B: all five V1 layers assembled on blue (gap and white check) -->
+  <text x="338" y="14" font-weight="700">B. Layers assembled on blue: gaps show blue, white shows white</text>
+  <g transform="translate(338 22)">
+    <rect width="312" height="148" fill="#2448C8"/>
+    <g clip-path="url(#c-sole)"><use href="#v1"/></g>
+    <g clip-path="url(#c-sidewall-toe)"><use href="#v1"/></g>
+    <g clip-path="url(#c-upper)"><use href="#v1"/></g>
+    <g clip-path="url(#c-laces)"><use href="#v1"/></g>
+  </g>
+
+  <!-- Row 2: each layer on its own, on blue, half scale -->
+  <text x="10" y="196" font-weight="700">C. Each layer alone (half scale). Upper is shown with its flat upper-fill (#931C25).</text>
+  <g transform="translate(10 204) scale(.5)">
+    <rect width="312" height="148" fill="#2448C8"/>
+    <g clip-path="url(#c-sole)"><use href="#v1"/></g>
+    <text x="4" y="14" font-size="14" fill="#fff">sole</text>
+  </g>
+  <g transform="translate(172 204) scale(.5)">
+    <rect width="312" height="148" fill="#2448C8"/>
+    <g clip-path="url(#c-sidewall-toe)"><use href="#v1"/></g>
+    <text x="4" y="14" font-size="14" fill="#fff">sidewall-toe</text>
+  </g>
+  <g transform="translate(334 204) scale(.5)">
+    <rect width="312" height="148" fill="#2448C8"/>
+    <use href="#poly-upper-fill" fill="#931C25"/>
+    <g clip-path="url(#c-upper)"><use href="#v1"/></g>
+    <text x="4" y="14" font-size="14" fill="#fff">upper + upper-fill</text>
+  </g>
+  <g transform="translate(496 204) scale(.5)">
+    <rect width="312" height="148" fill="#2448C8"/>
+    <g clip-path="url(#c-laces)"><use href="#v1"/></g>
+    <text x="4" y="14" font-size="14" fill="#fff">laces</text>
+  </g>
+
+  <!-- Row 3: insole from V3 -->
+  <text x="10" y="300" font-weight="700">D. Insole from V3 (sheet x 44..146, y 256..319), shown at 2x</text>
+  <g transform="translate(10 308) scale(2)">
+    <g clip-path="url(#c-ins)"><use href="#v3"/></g>
+    <rect width="102" height="63" fill="none" stroke="#6E6566" stroke-width=".4" stroke-dasharray="1.5 1.5"/>
+    <use href="#poly-insole" fill="#ffb000" fill-opacity=".2" stroke="#b07a00" stroke-width=".5"/>
+  </g>
+  <g transform="translate(232 308) scale(2)">
+    <rect width="102" height="63" fill="#2448C8"/>
+    <g clip-path="url(#c-insole)"><use href="#v3"/></g>
+  </g>
+
+  <!-- Row 3, right: overlay check, eyelet rings and stitch traces on V1 -->
+  <text x="454" y="300" font-weight="700">E. Overlay check (eyelets, stitches)</text>
+  <g transform="translate(454 308) scale(.62)">
+    <g clip-path="url(#c-v1)"><use href="#v1"/></g>
+    <g fill="none" stroke="#00E0FF" stroke-width="1">
+      <circle cx="111.1" cy="45" r="4.6"/><circle cx="134.3" cy="53.6" r="4.6"/><circle cx="157.9" cy="62.9" r="4.6"/>
+      <circle cx="181.4" cy="70.7" r="4.6"/><circle cx="206" cy="77.9" r="4.6"/><circle cx="231.4" cy="85.7" r="4.6"/>
+      <path d="M20.5,51.5 C27,58.5 36,63.5 47,64.6 C58,65.6 70,64 78,58.5 C82.5,55.3 86,51.5 88.5,48"/>
+      <path d="M90,51.6 L176,74.4 L266,98.2"/>
+    </g>
+  </g>
+
+  <g font-size="8" fill="#1F1A1B">
+    <text x="10" y="460">Sheet measured at 612 x 551 px. V1 box: sheet x 36..348, y 32..180. Insole box: sheet x 44..146, y 256..319.</text>
+    <text x="10" y="474">Stack order in the blend group, bottom to top: sole, sidewall-toe, insole, upper (upper-fill under the upper image), laces.</text>
+    <text x="10" y="488">Seams: the later layer overlaps the earlier one by 0.6 units (sole &lt; sidewall-toe &lt; upper &lt; laces); upper-fill runs 0.6 under the upper.</text>
+    <text x="10" y="502">upper-fill is a flat colour polygon (#931C25) that fills the lace hole in the upper until the laces layer covers it.</text>
+  </g>
+</svg>

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Frame: product section and sticky bar (after "Skip to buy")</title>
+<link rel="icon" href="../svg/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="frames.css">
+</head>
+<body>
+<a class="skip-link" href="#product">Skip to content</a>
+<header class="topbar">
+  <a class="wordmark" href="#build"><span data-mark></span>Ember Low</a>
+  <a class="topbar__buy" href="#product">Skip to buy</a>
+</header>
+<main>
+  <!-- This frame shows the state after the size-error attempt is fixed: EU 42 chosen, status shown.
+       The error state is shown as a second buy panel lower down, labelled in the notes. -->
+  <section class="product" id="product" aria-labelledby="product-name">
+    <div class="product__head">
+      <h2 class="product__name display" id="product-name">Ember Low</h2>
+      <p class="product__price">69 EUR</p>
+      <p class="product__lead">Red canvas low-top on a white rubber sole.</p>
+      <p class="product__tax">Price includes tax</p>
+    </div>
+
+    <div class="viewer">
+      <div class="viewer__stage sheet">
+        <div class="view view--side" role="img" aria-label="Red canvas low-top sneaker from the side: white rubber sole with a black stripe, white toe cap, white laces through six metal eyelets."></div>
+      </div>
+      <div class="thumbs sheet" role="group" aria-label="Views">
+        <button type="button" aria-pressed="true" aria-label="Side view"><span class="view view--side"></span></button>
+        <button type="button" aria-pressed="false" aria-label="Front view"><span class="view view--front"></span></button>
+        <button type="button" aria-pressed="false" aria-label="Top view"><span class="view view--top"></span></button>
+        <button type="button" aria-pressed="false" aria-label="Back view"><span class="view view--back"></span></button>
+        <button type="button" aria-pressed="false" aria-label="Rear three-quarter view"><span class="view view--rear"></span></button>
+        <button type="button" aria-pressed="false" aria-label="Low front three-quarter view"><span class="view view--front-low"></span></button>
+      </div>
+    </div>
+
+    <div class="buy">
+      <fieldset class="sizes" aria-describedby="size-help">
+        <legend>Size (EU)</legend>
+        <p id="size-help" class="visually-hidden">Choose one size.</p>
+        <div class="sizes__grid">
+          <label class="size"><input type="radio" name="size" value="36"><span>36</span></label>
+          <label class="size"><input type="radio" name="size" value="37"><span>37</span></label>
+          <label class="size"><input type="radio" name="size" value="38"><span>38</span></label>
+          <label class="size"><input type="radio" name="size" value="39"><span>39</span></label>
+          <label class="size"><input type="radio" name="size" value="40"><span>40</span></label>
+          <label class="size"><input type="radio" name="size" value="41"><span>41</span></label>
+          <label class="size"><input type="radio" name="size" value="42" checked><span>42</span></label>
+          <label class="size"><input type="radio" name="size" value="43"><span>43</span></label>
+          <label class="size"><input type="radio" name="size" value="44"><span>44</span></label>
+          <label class="size"><input type="radio" name="size" value="45"><span>45</span></label>
+          <label class="size"><input type="radio" name="size" value="46"><span>46</span></label>
+        </div>
+      </fieldset>
+      <button type="button" class="btn-primary">Add to cart</button>
+      <p class="status" role="status"><span data-icon="check"></span><span>Added to cart: Ember Low, EU 42. This is a demo, so no order was placed.</span></p>
+      <ul class="terms">
+        <li>Free returns within 30 days.</li>
+        <li>Delivered in 2 to 4 working days.</li>
+      </ul>
+      <div class="made-of">
+        <h3>What it is made of</h3>
+        <ol>
+          <li><span>1</span><span>Rubber sole with a single black stripe</span></li>
+          <li><span>2</span><span>Rubber toe cap and sidewall</span></li>
+          <li><span>3</span><span>Red canvas upper, contrast stitching</span></li>
+          <li><span>4</span><span>Fabric insole and lining</span></li>
+          <li><span>5</span><span>Metal eyelets and flat white laces</span></li>
+        </ol>
+      </div>
+      <p class="closing">Ready to wear on day one.</p>
+
+      <!-- Error state reference (in the site this replaces the status line, never both) -->
+      <div class="error-demo" aria-hidden="true">
+        <p class="error"><span data-icon="alert"></span><span>Choose a size to add to cart.</span></p>
+      </div>
+    </div>
+  </section>
+</main>
+<footer class="footer">
+  <p>Demo page. The name, price, sizes, returns and delivery terms are placeholders.</p>
+</footer>
+<aside class="buybar" aria-label="Quick add to cart">
+  <div><p class="buybar__name">Ember Low</p><p class="buybar__price">69 EUR</p></div>
+  <button type="button" class="btn-primary">Add to cart</button>
+</aside>
+<script src="frame.js"></script>
+</body>
+</html>

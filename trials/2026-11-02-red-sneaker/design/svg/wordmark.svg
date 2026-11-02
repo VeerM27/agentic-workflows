@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 168 28" role="img" aria-labelledby="wordmark-title">
+  <title id="wordmark-title">Ember Low</title>
+  <!-- Lock-up: mark + name. On the page, use svg/mark.svg next to real HTML text instead,
+       so the name uses the page fonts and stays selectable; this file is for previews and OG images. -->
+  <g transform="translate(0 2)">
+    <path fill="#A5202D" d="M3,15.5 C3,10.5 3.6,7 5.6,4.6 C8.6,8 12.8,8.9 16.6,7.6 C18,4.2 19.4,2 21.6,2 L35.6,11.6 L38,15.5 Z"/>
+    <rect x="2" y="15.5" width="37" height="6.5" rx="3" fill="#F7F5F1" stroke="#1F1A1B" stroke-width="1"/>
+    <path d="M6,19 H28" stroke="#1F1A1B" stroke-width="1.4" stroke-linecap="round"/>
+  </g>
+  <text x="48" y="21" fill="#1F1A1B" font-family="Bahnschrift, 'DIN Alternate', 'Roboto Condensed', 'Arial Narrow', sans-serif" font-weight="700" font-size="21" letter-spacing="0">Ember Low</text>
+</svg>

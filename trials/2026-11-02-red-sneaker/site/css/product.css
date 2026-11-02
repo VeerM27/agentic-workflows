@@ -1,0 +1,148 @@
+/*
+  Ember Low: product section (viewer, buy panel), footer and the mobile sticky add-to-cart bar.
+*/
+
+.product {
+  padding: var(--space-4) var(--space-gutter) var(--space-8);
+  max-width: var(--page-max); margin-inline: auto;
+  display: grid; gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "head" "viewer" "buy";
+  scroll-margin-top: var(--bar-height);
+}
+.product__head { grid-area: head; display: grid; grid-template-columns: 1fr auto; column-gap: var(--space-4); align-items: baseline; }
+.product__name { font-size: var(--text-part); line-height: 1; }
+.product__price {
+  font-family: var(--font-display); font-stretch: var(--font-display-stretch);
+  font-weight: var(--font-weight-display); font-size: var(--text-2xl); line-height: 1; text-align: right;
+}
+.product__lead { color: var(--color-text-muted); font-size: var(--text-base); }
+.product__tax { color: var(--color-text-muted); font-size: var(--text-sm); text-align: right; }
+
+/* ---------- Viewer: six crops of one sheet, cross-faded ---------- */
+.viewer { grid-area: viewer; display: grid; gap: var(--space-2); }
+.viewer__stage {
+  aspect-ratio: 16 / 10; border-radius: var(--radius-sheet);
+  display: grid; place-items: center; container-type: size; overflow: hidden;
+}
+.viewer__stage > .view { grid-area: 1 / 1; opacity: 0; }
+.viewer__stage > .view.is-active { opacity: 1; }
+@media (prefers-reduced-motion: no-preference) {
+  .viewer__stage > .view { transition: opacity var(--duration-base) var(--ease-out); }
+}
+
+.view {
+  /* One crop of the sheet, multiplied onto the sheet panel. --vx/--vy/--vw/--vh = view box in sheet px.
+     Width cap: native size x 1.8 (the source views are only about 310px wide). */
+  aspect-ratio: var(--vw) / var(--vh);
+  width: min(var(--shoe-max), calc(var(--vw) * 1.8px), 88cqw, calc(80cqh * var(--vw) / var(--vh)));
+  background-image: url("../assets/red-sneaker-sheet.png");
+  background-repeat: no-repeat;
+  background-size: calc(612 / var(--vw) * 100%) calc(551 / var(--vh) * 100%);
+  background-position: calc(var(--vx) / (612 - var(--vw)) * 100%) calc(var(--vy) / (551 - var(--vh)) * 100%);
+  mix-blend-mode: multiply;
+}
+.view--side       { --vx: 36;  --vy: 32;  --vw: 312; --vh: 148; }
+.view--front      { --vx: 408; --vy: 24;  --vw: 134; --vh: 158; }
+.view--top        { --vx: 34;  --vy: 224; --vw: 312; --vh: 112; }
+.view--back       { --vx: 428; --vy: 196; --vw: 114; --vh: 168; }
+.view--rear       { --vx: 52;  --vy: 372; --vw: 246; --vh: 152; }
+.view--front-low  { --vx: 340; --vy: 370; --vw: 252; --vh: 154; }
+
+.thumbs { display: grid; grid-template-columns: repeat(6, minmax(var(--target-min), 1fr)); gap: var(--space-1); border-radius: var(--radius-sheet); }
+.thumbs button {
+  aspect-ratio: 1; min-height: var(--target-min); padding: 3px; cursor: pointer;
+  background: transparent;
+  border: 2px solid transparent; border-radius: var(--radius-control);
+  display: grid; place-items: center; container-type: size;
+}
+.thumbs button:hover { border-color: var(--color-sheet-line); }
+.thumbs button[aria-pressed="true"] { border-color: var(--color-sheet-ink); }
+.thumbs .view { width: min(92cqw, calc(92cqh * var(--vw) / var(--vh))); }
+
+/* ---------- Buy panel ---------- */
+.buy { grid-area: buy; display: grid; gap: var(--space-4); align-content: start; }
+.sizes { border: 0; display: grid; gap: var(--space-2); min-width: 0; }
+.sizes legend { font-weight: var(--font-weight-strong); padding: 0; margin-bottom: var(--space-2); }
+.sizes__grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--space-1); }
+.size { position: relative; }
+.size input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.size span {
+  display: grid; place-items: center; min-height: var(--target-min); min-width: var(--target-min);
+  border: 1.5px solid var(--color-control-border); border-radius: var(--radius-control);
+  background: var(--color-surface-raised); font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.size:hover span { border-color: var(--color-text); }
+.size input:checked + span { background: var(--color-text); border-color: var(--color-text); color: var(--color-surface); font-weight: var(--font-weight-strong); }
+.size input:focus-visible + span { outline: var(--focus-width) solid var(--color-focus); outline-offset: var(--focus-offset); }
+
+.sizes.is-invalid .size span { border-color: var(--color-error); border-width: 2px; }
+.error { display: flex; gap: var(--space-2); align-items: start; color: var(--color-error); font-weight: var(--font-weight-strong); }
+.error svg { margin-top: 0.15rem; }
+
+/* The live region is always in the DOM; the message inside it is shown on success. */
+.status__msg { display: flex; gap: var(--space-2); align-items: start; }
+.status__msg svg { margin-top: 0.15rem; }
+
+.terms { display: grid; gap: var(--space-1); color: var(--color-text); }
+.made-of { display: grid; gap: var(--space-2); padding-top: var(--space-4); border-top: var(--line-hair) solid var(--color-control-border); }
+.made-of h3 { font-size: var(--text-base); font-weight: var(--font-weight-strong); }
+.made-of ol { display: grid; gap: var(--space-1); }
+.made-of li { display: grid; grid-template-columns: 1.75rem 1fr; align-items: baseline; color: var(--color-text-muted); }
+.made-of li span:first-child { font-family: var(--font-display); font-weight: var(--font-weight-display); color: var(--color-text); }
+.closing {
+  font-family: var(--font-display); font-stretch: var(--font-display-stretch); font-weight: var(--font-weight-display);
+  font-size: var(--text-xl); line-height: var(--leading-snug);
+}
+
+@media (min-width: 600px) {
+  .sizes__grid { grid-template-columns: repeat(6, minmax(var(--target-min), 4.5rem)); }
+}
+
+@media (min-width: 1024px) {
+  .product {
+    grid-template-columns: minmax(0, 7fr) minmax(20rem, 5fr);
+    grid-template-areas: "viewer head" "viewer buy" "viewer .";
+    grid-template-rows: auto auto 1fr;
+    column-gap: var(--space-7); row-gap: var(--space-5);
+    padding-top: var(--space-7);
+  }
+  .viewer { position: sticky; top: calc(var(--bar-height) + var(--space-4)); align-self: start; }
+  .product__head { grid-template-columns: 1fr; row-gap: var(--space-2); }
+  .product__price, .product__tax { text-align: left; }
+  .product__price { grid-row: 3; margin-top: var(--space-3); }
+  .product__tax { grid-row: 4; }
+  .sizes__grid { grid-template-columns: repeat(6, minmax(var(--target-min), 3.5rem)); }
+}
+
+/* ---------- Footer ---------- */
+.footer {
+  padding: var(--space-6) var(--space-gutter) calc(var(--space-6) + 5rem); /* room for the sticky bar */
+  color: var(--color-text-muted); font-size: var(--text-sm);
+  max-width: var(--page-max); margin-inline: auto;
+}
+.footer p { max-width: var(--measure); }
+@media (min-width: 768px) { .footer { padding-bottom: var(--space-6); } }
+
+/* ---------- Sticky add-to-cart bar (below 768px, after the build) ---------- */
+.buybar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 6;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  padding: var(--space-2) var(--space-gutter) calc(var(--space-2) + env(safe-area-inset-bottom));
+  background: var(--color-surface-raised);
+  border-top: var(--line-hair) solid var(--color-control-border);
+  /* Hidden until js/product.js sets data-visible; visibility also removes it from the tab order. */
+  transform: translateY(100%); opacity: 0; visibility: hidden;
+}
+.buybar[data-visible] { transform: none; opacity: 1; visibility: visible; }
+@media (prefers-reduced-motion: no-preference) {
+  .buybar {
+    transition: transform var(--duration-base) var(--ease-out), opacity var(--duration-base) var(--ease-out),
+                visibility 0s linear var(--duration-base);
+  }
+  .buybar[data-visible] { transition-delay: 0s; }
+}
+.buybar__name { font-weight: var(--font-weight-strong); line-height: 1.2; }
+.buybar__price { color: var(--color-text-muted); line-height: 1.2; }
+.buybar .btn-primary { width: auto; min-height: 3rem; }
+@media (min-width: 768px) { .buybar { display: none; } }

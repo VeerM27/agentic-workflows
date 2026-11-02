@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 312 148" overflow="visible" aria-hidden="true" focusable="false" class="contact-shadow">
+  <!-- Soft contact shadow, V1-local. Sits BEHIND the layer group, inside the multiply backdrop.
+       Fade in with opacity during the settle (94..100%). -->
+  <defs>
+    <radialGradient id="contact-shadow-fill" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#1F1A1B" stop-opacity=".30"/>
+      <stop offset=".7" stop-color="#1F1A1B" stop-opacity=".10"/>
+      <stop offset="1" stop-color="#1F1A1B" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <ellipse id="contact-shadow" cx="150" cy="146" rx="158" ry="6" fill="url(#contact-shadow-fill)"/>
+</svg>

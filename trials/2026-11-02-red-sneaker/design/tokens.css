@@ -1,0 +1,132 @@
+/*
+  Ember Low design tokens.
+  Concept: a shoe-maker's tech pack. A paper "sheet" (stage) lies on a raw-canvas table (page).
+  Colour tokens are named by role. Every text pair is listed with its measured ratio in design-notes.md.
+
+  Two scopes:
+  - Page chrome (:root) follows prefers-color-scheme.
+  - The sheet (.sheet, the build stage and the product viewer) never goes dark, because the shoe
+    is blended onto it with mix-blend-mode: multiply. Inside .sheet the text, primary and focus
+    roles are re-pointed to their sheet values, so components read the same tokens everywhere.
+*/
+
+:root {
+  color-scheme: light dark;
+
+  /* ---------- Colour: page chrome, light ---------- */
+  --color-surface: #E5E0D8;          /* raw canvas: page background, top bar */
+  --color-surface-raised: #F2EFEA;   /* sticky bar, size options, error box */
+  --color-text: #1F1A1B;             /* body and headings (13.1:1 on surface) */
+  --color-text-muted: #5B5250;       /* secondary copy, upcoming steps (5.8:1) */
+  --color-primary: #A5202D;          /* the shoe's red: actions and the current step only (5.6:1) */
+  --color-primary-hover: #8C1A26;    /* pressed/hover fill (white on it 9.2:1) */
+  --color-on-primary: #FFFFFF;       /* text on primary (7.4:1) */
+  --color-control-border: #6E6566;   /* size option and input borders (4.3:1, UI needs 3:1) */
+  --color-error: #A5202D;            /* error text; always paired with an icon and a message */
+  --color-focus: #1F1A1B;            /* focus ring (13.1:1 on surface, 15.8:1 on sheet) */
+
+  /* ---------- Colour: the sheet (fixed in every scheme) ---------- */
+  --color-sheet: #F7F5F1;            /* drawing sheet: stage and viewer panels */
+  --color-sheet-ink: #1F1A1B;        /* text, tags, leader lines on the sheet (15.8:1) */
+  --color-sheet-line: #6E6566;       /* dashed cut line (5.2:1) */
+  --color-sheet-thread: #F7F5F1;     /* stitch traces, eyelet rings, grainline over the shoe */
+  --color-sheet-primary: #A5202D;    /* red used on the sheet (6.8:1) */
+  --color-upper-fill: #931C25;       /* flat canvas red that fills the lace hole of the upper layer (matched by eye after multiply) */
+
+  /* ---------- Type ---------- */
+  /* Display: DIN-lineage condensed grotesques that ship with the OS (engineering-drawing lettering).
+     Body: the platform UI face. No web fonts are downloaded. */
+  --font-display: Bahnschrift, "DIN Alternate", "DIN Condensed", "D-DIN", "Roboto Condensed",
+    "sans-serif-condensed", "Arial Narrow", "Liberation Sans Narrow", system-ui, sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Liberation Sans",
+    Arial, sans-serif;
+  --font-display-stretch: 87.5%;     /* Bahnschrift SemiCondensed; ignored where unsupported */
+  --font-weight-body: 400;
+  --font-weight-strong: 600;
+  --font-weight-display: 700;
+
+  /* Scale: the classic typographic scale (Bringhurst) 14 16 18 21 24 36 48 72,
+     with fluid steps for the two display sizes. 1rem = 16px. */
+  --text-sm: 0.875rem;                                 /* 14: legal, footer, tag notes */
+  --text-base: 1rem;                                   /* 16: body, controls */
+  --text-md: 1.125rem;                                 /* 18: captions, subhead */
+  --text-lg: 1.3125rem;                                /* 21: step label, buy-panel lead */
+  --text-xl: 1.5rem;                                   /* 24: section titles on mobile */
+  --text-2xl: 2.25rem;                                 /* 36: price */
+  --text-part: clamp(2rem, 1.55rem + 1.9vw, 3rem);     /* 32 to 48: part name in the caption */
+  --text-display: clamp(2.75rem, 1.9rem + 3.8vw, 4.5rem); /* 44 to 72: the H1 */
+
+  --leading-tight: 0.95;     /* display */
+  --leading-snug: 1.2;       /* part names, price */
+  --leading-body: 1.5;       /* body copy */
+  --tracking-display: -0.01em;
+  --measure: 34rem;          /* max line length for body copy, about 65 characters */
+  --measure-caption: 24rem;  /* captions, about 45 characters */
+
+  /* ---------- Space (4px base) ---------- */
+  --space-1: 0.25rem;  /* 4 */
+  --space-2: 0.5rem;   /* 8 */
+  --space-3: 0.75rem;  /* 12 */
+  --space-4: 1rem;     /* 16 */
+  --space-5: 1.5rem;   /* 24 */
+  --space-6: 2rem;     /* 32 */
+  --space-7: 3rem;     /* 48 */
+  --space-8: 4rem;     /* 64 */
+  --space-9: 6rem;     /* 96 */
+  --space-gutter: clamp(1rem, 0.6rem + 1.8vw, 2.5rem); /* page side padding, 16 to 40 */
+
+  /* ---------- Radii: by hierarchy, not one value everywhere ---------- */
+  --radius-sheet: 3px;       /* paper: nearly square corners */
+  --radius-control: 6px;     /* size options, buttons */
+  --radius-tag: 999px;       /* round part tags and the step dots */
+
+  /* ---------- Lines ---------- */
+  --line-hair: 1px;
+  --focus-width: 3px;
+  --focus-offset: 2px;
+
+  /* ---------- Layout ---------- */
+  --bar-height: 3rem;              /* top bar, 48px; 56px from 1024px */
+  --shoe-max: 560px;               /* never show the 312px-wide source view wider than this */
+  --page-max: 84rem;               /* 1344px content width cap */
+  --target-min: 44px;              /* minimum touch target */
+
+  /* ---------- Motion ---------- */
+  --duration-quick: 120ms;   /* press feedback */
+  --duration-base: 200ms;    /* hover, thumbnail cross-fade, sticky bar in/out */
+  --duration-load: 900ms;    /* the one load moment: cut line draws on */
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.6, 0, 0.3, 1);
+  /* Scroll-mapped values are linear in time; easing is applied in the maths (see build.css notes). */
+}
+
+@media (min-width: 1024px) {
+  :root { --bar-height: 3.5rem; }
+}
+
+/* ---------- Dark page chrome. The sheet keeps its light values. ---------- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-surface: #1B1416;
+    --color-surface-raised: #261D20;
+    --color-text: #F3EEE8;           /* 15.7:1 */
+    --color-text-muted: #B9AEA8;     /* 8.4:1 */
+    --color-primary: #EE6670;        /* 5.8:1 on surface, 5.3:1 on raised */
+    --color-primary-hover: #F49AA0;  /* surface text on it 8.6:1 */
+    --color-on-primary: #1B1416;     /* 5.8:1 on primary */
+    --color-control-border: #8F8582; /* 5.1:1 */
+    --color-error: #EE6670;
+    --color-focus: #F3EEE8;
+  }
+}
+
+/* Inside the sheet, re-point the roles that components use. */
+.sheet {
+  --color-text: var(--color-sheet-ink);
+  --color-text-muted: #5B5250;       /* 7.0:1 on sheet */
+  --color-primary: var(--color-sheet-primary);
+  --color-on-primary: #FFFFFF;
+  --color-focus: var(--color-sheet-ink);
+  background-color: var(--color-sheet);
+  color: var(--color-sheet-ink);
+}
