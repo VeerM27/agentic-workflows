@@ -1,7 +1,7 @@
+version: 1
 name: code_reviewer
 description: Reviews the implementation for correctness, security, accessibility, and fidelity to spec and design.
 role: reviewer
-model: claude-opus-5-5
 effort: high
 tools: [list_files, read_file, render_page]
 

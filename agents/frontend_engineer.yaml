@@ -1,10 +1,11 @@
+version: 1
 name: frontend_engineer
 description: Builds the working web app from the spec and the approved designs.
 role: producer
-model: claude-opus-5-5
 effort: high
 max_turns: 60
-tools: [list_files, read_file, write_file, edit_file, delete_file, render_page]
+tools: [list_files, read_file, write_file, edit_file, delete_file, render_page, check_contrast]
+skills: [frontend-design]
 
 inputs:
   spec:
@@ -14,9 +15,12 @@ inputs:
   design:
     type: text
     description: Hand-off from the designer; mockups and tokens are under design/.
+  animations:
+    type: text
+    description: Hand-off from the SVG animator; integrate these animations where the design calls for them.
   stack:
     type: text
-    default: "Vanilla HTML, CSS and JavaScript (ES modules), no build step, no external dependencies."
+    default: "Follow the house style's default stack."
     description: Technology choices and constraints.
 
 system_prompt: |

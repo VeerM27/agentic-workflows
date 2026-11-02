@@ -45,7 +45,7 @@ def test_render_page_uses_renderer(tmp_path):
     ws.write_text("p.html", "<h1>x</h1>")
     seen = {}
 
-    def renderer(path, width, full_page):
+    def renderer(path, width, full_page, scroll_y=None):
         seen.update(path=path, width=width)
         return b"png-bytes"
 

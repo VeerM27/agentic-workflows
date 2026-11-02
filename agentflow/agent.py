@@ -9,6 +9,7 @@ from typing import Any, Callable
 from .config import AgentSpec
 from .tools import (
     COMPLETE_TASK,
+    SKILL_TOOL,
     SUBMIT_REVIEW,
     ToolExecutor,
     invalid_json_result,
@@ -52,6 +53,16 @@ that meets the bar: block only on issues that matter, and make every issue speci
 """
 
 
+SKILLS_PREAMBLE = """\
+# Skills
+
+You have been equipped with the skills below. Follow them where they apply to your task. They were \
+written for interactive use: where a skill says to ask the user or wait for their choice, make the \
+best decision yourself, state it in your hand-off notes, and continue. A human reviews your work at \
+the end of this step and can send it back.
+"""
+
+
 class AgentError(Exception):
     """The agent could not finish its task."""
 
@@ -89,9 +100,17 @@ class AgentResult:
     usage: Usage = field(default_factory=Usage)
 
 
-def system_prompt_for(spec: AgentSpec) -> str:
+def system_prompt_for(spec: AgentSpec, house_style: str = "", skills: list | None = None) -> str:
     rules = REVIEWER_RULES if spec.role == "reviewer" else PRODUCER_RULES
-    return f"{PIPELINE_PREAMBLE.format(name=spec.name)}\n{rules}\n# Your role\n\n{spec.system_prompt}\n"
+    parts = [PIPELINE_PREAMBLE.format(name=spec.name), rules, f"# Your role\n\n{spec.system_prompt}\n"]
+    if house_style:
+        parts.append(
+            "# House style\n\nThe operator of this pipeline applies these preferences to all work. "
+            f"Follow them unless your inputs say otherwise.\n\n{house_style}\n"
+        )
+    if skills:
+        parts.append(SKILLS_PREAMBLE + "\n" + "\n\n".join(s.prompt_section() for s in skills) + "\n")
+    return "\n".join(parts)
 
 
 def _block_to_dict(block: Any) -> Any:
@@ -114,16 +133,25 @@ class AgentRunner:
         on_event: Callable[..., None] | None = None,
         use_fallbacks: bool = True,
         renderer: Callable[..., bytes] | None = None,
+        model: str | None = None,
+        effort: str | None = None,
+        house_style: str = "",
+        skills: list | None = None,
     ):
         self.spec = spec
         self.client = client
         self.workspace = workspace
         self.on_event = on_event or (lambda *a, **k: None)
         self.use_fallbacks = use_fallbacks
+        self.model = model or spec.model or "claude-opus-5-5"
+        self.effort = effort or spec.effort or "high"
+        self.skills = list(skills or [])
         self.terminal = terminal_tool_for(spec.role)
-        self.tools = tool_params(spec.tools, self.terminal)
-        self.executor = ToolExecutor(workspace, renderer=renderer)
-        self.system = system_prompt_for(spec)
+        tool_names = list(spec.tools) + ([SKILL_TOOL] if self.skills else [])
+        self.tools = tool_params(tool_names, self.terminal)
+        self.executor = ToolExecutor(workspace, renderer=renderer, skills={s.name: s for s in self.skills})
+        self.system = system_prompt_for(spec, house_style, self.skills)
+        self._tool_names = {t["name"] for t in self.tools}
         self.messages: list[dict] = []
         self.usage = Usage()
         self.turns = 0
@@ -143,6 +171,17 @@ class AgentRunner:
             raise AgentError("agent has not started yet")
         self.messages.append({"role": "user", "content": [{"type": "text", "text": text}]})
         return self._loop()
+
+    def restore(self, messages: list[dict]) -> None:
+        """Load a saved conversation (from transcript()) so follow_up() can continue it."""
+        if self.messages:
+            raise AgentError("agent already has a conversation")
+        self.messages = list(messages)
+
+    def pop_usage(self) -> Usage:
+        """Return usage since the last call and reset the counter."""
+        usage, self.usage = self.usage, Usage()
+        return usage
 
     def transcript(self) -> list[dict]:
         out = []
@@ -213,18 +252,18 @@ class AgentRunner:
 
     def _create(self):
         params: dict[str, Any] = {
-            "model": self.spec.model,
+            "model": self.model,
             "max_tokens": self._max_tokens,
             "system": self.system,
             "messages": self.messages,
             "tools": self.tools,
             "thinking": {"type": "adaptive"},
-            "output_config": {"effort": self.spec.effort},
+            "output_config": {"effort": self.effort},
             # Automatic prompt caching: caches the growing conversation prefix so
             # each loop iteration only pays full price for new content.
             "cache_control": {"type": "ephemeral"},
         }
-        if self.use_fallbacks and self.spec.model in FALLBACK_MODELS:
+        if self.use_fallbacks and self.model in FALLBACK_MODELS:
             # If a safety classifier declines, the API re-runs the request on
             # Anthropic's recommended fallback model instead of returning a refusal.
             params["betas"] = [FALLBACK_BETA]
@@ -258,6 +297,12 @@ class AgentRunner:
             if error:
                 results.append(invalid_json_result(block.id, block.input, error))
                 self.on_event("tool_error", agent=self.spec.name, tool=block.name, error=error)
+                continue
+
+            if block.name not in self._tool_names:
+                results.append(
+                    {"type": "tool_result", "tool_use_id": block.id, "is_error": True, "content": f"You do not have the tool '{block.name}'."}
+                )
                 continue
 
             if block.name in (COMPLETE_TASK, SUBMIT_REVIEW):

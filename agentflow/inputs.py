@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 from pathlib import Path
 from typing import Any
@@ -29,14 +30,30 @@ def as_list(value: Any) -> list:
     return [value]
 
 
+def list_profiles(library: Path) -> list[str]:
+    return sorted(p.stem for p in library.glob("*.md") if not p.stem.startswith("_"))
+
+
+def load_profile(name: str, library: Path) -> tuple[str, bool]:
+    """Return (text, from_library). Unknown names are used as a free-text description."""
+    slug = re.sub(r"[^a-z0-9]+", "-", name.strip().lower()).strip("-")
+    path = library / f"{slug}.md"
+    if slug and path.is_file():
+        return path.read_text(encoding="utf-8").strip(), True
+    return name.strip(), False
+
+
 def coerce_workflow_inputs(
-    specs: dict[str, InputSpec], given: dict[str, Any], base_dir: Path
+    specs: dict[str, InputSpec], given: dict[str, Any], base_dir: Path, library_root: Path | None = None
 ) -> dict[str, Any]:
     """Apply defaults, check required inputs, and normalise values by type.
 
     - text: a string; "@path" reads the string from a file
+    - integer: a whole number
     - file: a path to a text file (kept as a path; read when the agent runs)
     - image / images: one or more local paths or URLs (comma-separated string or list)
+    - profile: a name looked up in the input's library folder (e.g. `fintech` ->
+      profiles/industries/fintech.md); anything else is used as a free-text description
     """
     unknown = sorted(set(given) - set(specs))
     if unknown:
@@ -56,6 +73,15 @@ def coerce_workflow_inputs(
                 path = _local_path(value[1:], base_dir)
                 value = path.read_text(encoding="utf-8")
             resolved[name] = str(value)
+        elif spec.type == "integer":
+            try:
+                resolved[name] = int(value)
+            except (TypeError, ValueError):
+                raise InputError(f"input '{name}' must be a whole number, got '{value}'")
+        elif spec.type == "profile":
+            library = (library_root or base_dir) / spec.library
+            text, _ = load_profile(str(value), library)
+            resolved[name] = text
         elif spec.type == "file":
             resolved[name] = str(_local_path(str(value), base_dir))
         else:
@@ -160,6 +186,7 @@ def build_task_content(
         else:
             if isinstance(value, list):
                 value = "\n".join(f"- {v}" for v in value)
+            value = str(value)
             blocks.append({"type": "text", "text": f"## {title}{desc}\n\n{value}"})
 
     if instructions:

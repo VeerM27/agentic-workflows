@@ -1,7 +1,7 @@
+version: 1
 name: product_planner
 description: Turns a product brief (and optional reference images) into a concrete spec the rest of the team builds from.
 role: producer
-model: claude-opus-5-5
 effort: high
 tools: [list_files, read_file, write_file, edit_file]
 
@@ -13,6 +13,9 @@ inputs:
   references:
     type: images
     description: Screenshots, sketches or mood-board images that show the intended look or flow.
+  industry:
+    type: text
+    description: Industry profile (audience, tone, conventions, compliance) to design for.
   constraints:
     type: text
     description: Technical, brand or scope constraints (e.g. "no backend", "must work offline").

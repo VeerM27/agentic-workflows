@@ -1,34 +1,55 @@
+version: 1
 name: design-only
 description: |
-  Design one or more pages from text and/or images, with a design-principles check loop.
-  Useful on its own, or to iterate on a look before running the full webapp workflow.
+  Design one or more pages from text and/or images, checked by the design reviewer.
+  Set `variants` to explore several directions and pick one.
 
 inputs:
   brief:
     type: text
     required: true
     description: The page(s) to design and what they are for
+  industry:
+    type: profile
+    library: profiles/industries
+    description: Industry profile name or free-text description
   references:
     type: images
     description: Photos, screenshots or sketches to take direction from
+  palette:
+    type: text
+    description: Palette to use
   brand:
     type: text
     description: Brand guidance
   checklist:
     type: text
     description: Extra criteria the design checker should enforce
+  variants:
+    type: integer
+    default: 1
+    description: Number of distinct design directions
+  directions:
+    type: text
+    description: Optional creative direction per variant, one per line
 
 steps:
   - id: design
     agent: ux_designer
     inputs:
       brief: ${inputs.brief}
+      industry: ${inputs.industry}
       references: ${inputs.references}
+      palette: ${inputs.palette}
       brand: ${inputs.brand}
+    variants:
+      count: ${inputs.variants}
+      directions: ${inputs.directions}
     review:
       agent: design_reviewer
       max_rounds: 3
       inputs:
         brief: ${inputs.brief}
+        industry: ${inputs.industry}
         references: ${inputs.references}
         checklist: ${inputs.checklist}

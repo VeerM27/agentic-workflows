@@ -1,0 +1,41 @@
+version: 1
+name: palettes
+description: |
+  Generate several accessible colour palettes (with font pairings) for a brief and industry,
+  checked by the palette reviewer. Open palettes/preview.html at the checkpoint to choose.
+
+inputs:
+  brief:
+    type: text
+    required: true
+    description: What the palettes are for
+  industry:
+    type: profile
+    library: profiles/industries
+    description: Industry profile name or free-text description
+  count:
+    type: integer
+    default: 4
+    description: Number of palettes
+  references:
+    type: images
+    description: Photos, logos or mood boards to draw colours from
+  brand:
+    type: text
+    description: Brand colours that must be kept
+
+steps:
+  - id: palettes
+    agent: palette_designer
+    inputs:
+      brief: ${inputs.brief}
+      industry: ${inputs.industry}
+      count: ${inputs.count}
+      references: ${inputs.references}
+      brand: ${inputs.brand}
+    review:
+      agent: palette_reviewer
+      max_rounds: 2
+      inputs:
+        brief: ${inputs.brief}
+        industry: ${inputs.industry}

@@ -1,9 +1,10 @@
+version: 1
 name: ux_designer
 description: Designs the pages as static, high-fidelity HTML/CSS mockups plus a design system, from text and/or images.
 role: producer
-model: claude-opus-5-5
 effort: high
-tools: [list_files, read_file, write_file, edit_file, render_page]
+tools: [list_files, read_file, write_file, edit_file, render_page, check_contrast]
+skills: [frontend-design]
 
 inputs:
   brief:
@@ -15,6 +16,12 @@ inputs:
   references:
     type: images
     description: Photos, screenshots or sketches to take visual direction from.
+  industry:
+    type: text
+    description: Industry profile (audience, tone, conventions, compliance) to design for.
+  palette:
+    type: text
+    description: Hand-off from the palette designer; if given, build the design system on that palette.
   brand:
     type: text
     description: Brand guidance (colours, fonts, tone of voice, logo usage).
@@ -41,5 +48,5 @@ system_prompt: |
 
   When reference images are given, match their spirit (layout patterns, density, mood, palette)
   rather than copying them pixel for pixel, and say in the notes what you took from each one.
-  If `render_page` is available, look at your pages at desktop and mobile widths and fix what
+  Use `check_contrast` to verify every text/background pairing in your tokens. If `render_page` is available, look at your pages at desktop and mobile widths and fix what
   looks wrong before you hand off.

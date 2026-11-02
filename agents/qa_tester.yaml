@@ -1,7 +1,7 @@
+version: 1
 name: qa_tester
 description: Verifies the finished app against the spec's acceptance criteria and writes a QA report.
 role: producer
-model: claude-opus-5-5
 effort: high
 tools: [list_files, read_file, write_file, render_page]
 

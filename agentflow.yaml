@@ -1,0 +1,36 @@
+# agentflow project settings — the one file to personalise and future-proof your setup.
+version: 1
+
+# Model aliases. Agents refer to these names (or say nothing and get `default`), so when a new
+# model ships you change ONE line here instead of every agent file.
+models:
+  default: claude-opus-5-5
+  fast: claude-sonnet-5-5
+
+defaults:
+  model: default        # alias or full model ID for agents that don't set one
+  effort: high          # low | medium | high | xhigh | max (agents can override)
+  fallbacks: true       # server-side refusal fallback on models that support it
+
+# Your standing preferences, added to every agent's instructions. Edit this file freely.
+house_style: profiles/house-style.md
+
+# Claude Code skills (SKILL.md folders) pinned by commit. See skills/skills.yaml.
+skills:
+  manifest: skills/skills.yaml
+
+# How you are kept in the loop.
+approvals:
+  mode: terminal        # terminal: ask and wait | pause: save and exit, answer with `agentflow resume` | auto
+  checkpoints: all      # all | none | [step ids]; workflows and steps can override
+
+# Optional: a shell command run at checkpoints, pauses, finishes and failures. It receives
+# AGENTFLOW_EVENT, AGENTFLOW_RUN_DIR, AGENTFLOW_STEP, AGENTFLOW_GALLERY, AGENTFLOW_SUMMARY.
+# Examples:
+#   command: 'osascript -e "display notification \"$AGENTFLOW_EVENT $AGENTFLOW_STEP\" with title \"agentflow\""'
+#   command: 'curl -s -d "agentflow: $AGENTFLOW_EVENT $AGENTFLOW_STEP" ntfy.sh/your-private-topic'
+#   command: 'curl -s -X POST -H "Content-type: application/json" -d "{\"text\":\"agentflow $AGENTFLOW_EVENT $AGENTFLOW_STEP\"}" "$SLACK_WEBHOOK_URL"'
+notify:
+  command:
+
+runs_dir: runs

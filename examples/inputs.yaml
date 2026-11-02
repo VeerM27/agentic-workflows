@@ -1,6 +1,13 @@
 # Example inputs file: agentflow run workflows/webapp.yaml --inputs-file examples/inputs.yaml
+# Paths are relative to the directory you run agentflow from.
 brief: "@examples/habit-tracker-brief.md"
+industry: fitness-wellness          # a profile in profiles/industries, or free text
+design_variants: 3                  # explore three directions; pick one at the checkpoint
+directions: |
+  Calm and botanical: soft greens, rounded shapes, lots of air
+  Bold sporty energy: high contrast, oversized numerals
+  Journal-like and personal: paper textures, handwritten accents
 # references:
 #   - examples/moodboard-1.png
 #   - https://example.com/screenshot.png
-brand: "Soft greens and warm off-white; rounded shapes; Inter for UI text."
+brand: "Inter for UI text."

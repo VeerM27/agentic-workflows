@@ -1,0 +1,14 @@
+{
+  "frontend-design": {
+    "source": "anthropics/skills/skills/frontend-design@main",
+    "commit": "ca45fc496a3436251f191354091d557da31c15b5",
+    "hash": "sha256:7e9c2af00fd5b3144f49ce6fb1b16037b392ab9c2f049423b0b6114d99381ba2",
+    "synced_at": "2026-11-02T15:53:41+00:00"
+  },
+  "theme-factory": {
+    "source": "anthropics/skills/skills/theme-factory@main",
+    "commit": "ca45fc496a3436251f191354091d557da31c15b5",
+    "hash": "sha256:50bc5c8d91691c22c80aa3a77d437243398121a724531737530f4ed30cddf879",
+    "synced_at": "2026-11-02T15:53:42+00:00"
+  }
+}

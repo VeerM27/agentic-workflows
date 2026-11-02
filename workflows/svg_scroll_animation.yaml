@@ -1,0 +1,50 @@
+version: 1
+name: svg-scroll-animation
+description: |
+  Build a scroll-driven SVG animation from a brief and optional references, checked by the motion
+  reviewer. Set `variants` to get several takes to choose from.
+
+inputs:
+  brief:
+    type: text
+    required: true
+    description: What the animation shows and where it lives
+  references:
+    type: images
+    description: Artwork, sketches, storyboards or motion examples
+  palette:
+    type: text
+    description: Colours to use
+  industry:
+    type: profile
+    library: profiles/industries
+    description: Industry profile name or free-text description
+  technique:
+    type: text
+    description: Technical approach or constraints (defaults to CSS scroll timelines + JS fallback)
+  variants:
+    type: integer
+    default: 1
+    description: Number of different takes to produce
+  directions:
+    type: text
+    description: Optional direction per take, one per line (e.g. "line-art drawing" / "layered parallax")
+
+steps:
+  - id: animate
+    agent: svg_animator
+    inputs:
+      brief: ${inputs.brief}
+      references: ${inputs.references}
+      palette: ${inputs.palette}
+      industry: ${inputs.industry}
+      technique: ${inputs.technique}
+    variants:
+      count: ${inputs.variants}
+      directions: ${inputs.directions}
+    review:
+      agent: motion_reviewer
+      max_rounds: 3
+      inputs:
+        brief: ${inputs.brief}
+        references: ${inputs.references}

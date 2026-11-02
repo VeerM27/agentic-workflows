@@ -90,11 +90,56 @@ WORKSPACE_TOOLS: dict[str, dict] = {
             {
                 "path": {"type": "string", "description": "HTML file relative to the workspace root."},
                 "width": {"type": "integer", "description": "Viewport width in CSS pixels (default 1280)."},
-                "full_page": {"type": "boolean", "description": "Capture the whole scrollable page (default true, capped at 5000px tall)."},
+                "full_page": {"type": "boolean", "description": "Capture the whole scrollable page (default true, capped at 5000px tall). Ignored when scroll_y is set."},
+                "scroll_y": {
+                    "type": "integer",
+                    "description": "Scroll to this many pixels from the top and capture one 800px-tall viewport. Use several values to check scroll-driven animations frame by frame.",
+                },
             },
             ["path"],
         ),
     },
+}
+
+WORKSPACE_TOOLS["check_contrast"] = {
+    "description": (
+        "Compute WCAG 2.x contrast ratios for foreground/background colour pairs (hex, e.g. #1a2b3c or #fff). "
+        "Use it instead of estimating contrast by eye."
+    ),
+    "input_schema": _schema(
+        {
+            "pairs": {
+                "type": "array",
+                "items": _schema(
+                    {
+                        "foreground": {"type": "string"},
+                        "background": {"type": "string"},
+                        "label": {"type": "string", "description": "Optional name, e.g. 'body text on surface'."},
+                    },
+                    ["foreground", "background"],
+                ),
+            }
+        },
+        ["pairs"],
+    ),
+}
+
+# Tools an agent definition may list.
+AGENT_TOOLS = WORKSPACE_TOOLS
+
+# Added automatically to agents that have skills attached.
+SKILL_TOOL = "read_skill_file"
+SKILL_TOOLS: dict[str, dict] = {
+    SKILL_TOOL: {
+        "description": "Read a supporting file that belongs to one of your skills (the skill's instructions say which).",
+        "input_schema": _schema(
+            {
+                "skill": {"type": "string", "description": "Skill name."},
+                "path": {"type": "string", "description": "File path inside the skill, e.g. 'themes/ocean-depths.md'."},
+            },
+            ["skill", "path"],
+        ),
+    }
 }
 
 TERMINAL_TOOLS: dict[str, dict] = {
@@ -165,7 +210,7 @@ def tool_params(names: list[str], terminal: str, eager: bool = True) -> list[dic
     """
     params = []
     for name in [*names, terminal]:
-        spec = WORKSPACE_TOOLS.get(name) or TERMINAL_TOOLS[name]
+        spec = _ALL_TOOLS[name]
         param = {"name": name, "description": spec["description"], "input_schema": spec["input_schema"]}
         if eager:
             param["eager_input_streaming"] = True
@@ -173,11 +218,11 @@ def tool_params(names: list[str], terminal: str, eager: bool = True) -> list[dic
     return params
 
 
+_ALL_TOOLS = {**WORKSPACE_TOOLS, **SKILL_TOOLS, **TERMINAL_TOOLS}
+
+
 def schema_for(name: str) -> dict:
-    spec = WORKSPACE_TOOLS.get(name) or TERMINAL_TOOLS.get(name)
-    if spec is None:
-        raise KeyError(name)
-    return spec["input_schema"]
+    return _ALL_TOOLS[name]["input_schema"]
 
 
 _JSON_TYPES: dict[str, tuple[type, ...]] = {
@@ -253,9 +298,10 @@ class ToolOutcome:
 class ToolExecutor:
     """Runs workspace tools for one agent."""
 
-    def __init__(self, workspace: Workspace, renderer: Callable[..., bytes] | None = None):
+    def __init__(self, workspace: Workspace, renderer: Callable[..., bytes] | None = None, skills: dict | None = None):
         self.workspace = workspace
         self._renderer = renderer
+        self.skills = skills or {}
         self.files_written: set[str] = set()
 
     def run(self, name: str, args: dict) -> ToolOutcome:
@@ -304,21 +350,47 @@ class ToolExecutor:
         self.files_written.discard(self.workspace.relative(self.workspace.resolve(path)))
         return f"Deleted {path}"
 
-    def _tool_render_page(self, path: str, width: int = 1280, full_page: bool = True) -> list[dict]:
+    def _tool_render_page(self, path: str, width: int = 1280, full_page: bool = True, scroll_y: int | None = None) -> list[dict]:
         target = self.workspace.resolve(path)
         if not target.is_file():
             raise ToolError(f"file not found: {path}")
         if not 200 <= width <= 3000:
             raise ToolError("width must be between 200 and 3000")
+        if scroll_y is not None and scroll_y < 0:
+            raise ToolError("scroll_y must be 0 or more")
         renderer = self._renderer or render_html_screenshot
-        png = renderer(target, width=width, full_page=full_page)
+        png = renderer(target, width=width, full_page=full_page, scroll_y=scroll_y)
+        where = f", scrolled to y={scroll_y}px" if scroll_y is not None else ""
         return [
             image_block_from_bytes(png, "image/png"),
-            {"type": "text", "text": f"Screenshot of {path} at {width}px wide."},
+            {"type": "text", "text": f"Screenshot of {path} at {width}px wide{where}."},
         ]
 
+    def _tool_check_contrast(self, pairs: list[dict]) -> str:
+        if not pairs:
+            raise ToolError("give at least one pair")
+        lines = []
+        for pair in pairs[:100]:
+            ratio = contrast_ratio(pair["foreground"], pair["background"])
+            label = pair.get("label") or f"{pair['foreground']} on {pair['background']}"
+            verdict = (
+                "AAA" if ratio >= 7 else "AA" if ratio >= 4.5 else "AA large text only" if ratio >= 3 else "FAIL"
+            )
+            lines.append(f"{label}: {ratio:.2f}:1 — {verdict}")
+        return "\n".join(lines)
 
-def render_html_screenshot(path, width: int = 1280, full_page: bool = True, max_height: int = 5000) -> bytes:
+    def _tool_read_skill_file(self, skill: str, path: str) -> str:
+        if skill not in self.skills:
+            raise ToolError(f"you have no skill named '{skill}' (yours: {sorted(self.skills)})")
+        try:
+            return self.skills[skill].read(path)
+        except Exception as exc:  # SkillError, OSError
+            raise ToolError(str(exc)) from exc
+
+
+def render_html_screenshot(
+    path, width: int = 1280, full_page: bool = True, scroll_y: int | None = None, max_height: int = 5000
+) -> bytes:
     """Screenshot a local HTML file with Playwright (optional dependency)."""
     try:
         from playwright.sync_api import Error as PlaywrightError
@@ -336,7 +408,10 @@ def render_html_screenshot(path, width: int = 1280, full_page: bool = True, max_
             try:
                 page = browser.new_page(viewport={"width": width, "height": 800})
                 page.goto(path.as_uri(), wait_until="networkidle", timeout=20_000)
-                if full_page:
+                if scroll_y is not None:
+                    page.evaluate("y => window.scrollTo(0, y)", scroll_y)
+                    page.wait_for_timeout(400)  # let scroll-linked animations and observers settle
+                elif full_page:
                     height = min(int(page.evaluate("document.documentElement.scrollHeight")), max_height)
                     page.set_viewport_size({"width": width, "height": max(height, 1)})
                 return page.screenshot(full_page=False)
@@ -354,3 +429,28 @@ def invalid_json_result(tool_use_id: str, raw_input: Any, reason: str) -> dict:
         "is_error": True,
         "content": json.dumps({"INVALID_INPUT": reason, "received": raw_input}, default=str),
     }
+
+
+def _parse_hex(colour: str) -> tuple[float, float, float]:
+    c = colour.strip().lstrip("#")
+    if len(c) in (3, 4):
+        c = "".join(ch * 2 for ch in c[:3])
+    elif len(c) == 8:
+        c = c[:6]
+    if len(c) != 6 or any(ch not in "0123456789abcdefABCDEF" for ch in c):
+        raise ToolError(f"'{colour}' is not a hex colour like #1a2b3c")
+    return tuple(int(c[i : i + 2], 16) / 255 for i in (0, 2, 4))
+
+
+def _luminance(colour: str) -> float:
+    def channel(v: float) -> float:
+        return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+
+    r, g, b = (channel(v) for v in _parse_hex(colour))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def contrast_ratio(foreground: str, background: str) -> float:
+    a, b = _luminance(foreground), _luminance(background)
+    light, dark = max(a, b), min(a, b)
+    return (light + 0.05) / (dark + 0.05)

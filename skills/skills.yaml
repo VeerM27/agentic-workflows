@@ -1,0 +1,30 @@
+# Claude Code skills available to agents. Attach them in an agent file (`skills: [name]`) or on a
+# single workflow step. After editing this file run `agentflow skills sync` and commit skills/.
+#
+#   repo:  GitHub "owner/name" or any git URL (private repos use your normal git credentials)
+#   path:  the folder inside the repo that contains SKILL.md
+#   ref:   branch, tag or commit you follow; the exact commit is pinned in skills.lock.json
+#   local: a skill folder in this repo instead (your own skills)
+version: 1
+skills:
+  frontend-design:
+    repo: anthropics/skills
+    path: skills/frontend-design
+    ref: main
+    note: Distinctive, non-templated visual direction. Used by the designer and engineer.
+
+  theme-factory:
+    repo: anthropics/skills
+    path: skills/theme-factory
+    ref: main
+    note: Curated colour/font themes plus on-the-fly theme generation. Used by the palette designer.
+
+  svg-scroll-animation:
+    local: local/svg-scroll-animation
+    note: Your own motion techniques and standards. Edit it as your practice evolves.
+
+  # Add the skills you use, e.g.:
+  # my-team-skill:
+  #   repo: your-org/claude-skills
+  #   path: skills/brand-voice
+  #   ref: v1.2.0

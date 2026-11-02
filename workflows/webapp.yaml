@@ -1,27 +1,44 @@
+version: 1
 name: webapp
 description: |
-  Brief (+ optional reference images) -> spec -> reviewed designs -> reviewed implementation -> QA report.
+  Brief (+ industry, reference images) -> spec -> design (optionally several variants to choose from)
+  -> build -> QA. Each producer is checked by a reviewer agent, and you approve every step.
 
 inputs:
   brief:
     type: text
     required: true
     description: What to build. Pass a file with --input brief=@path/to/brief.md
+  industry:
+    type: profile
+    library: profiles/industries
+    description: An industry profile name (e.g. fintech, healthcare) or a free-text description
   references:
     type: images
     description: Reference photos, screenshots or sketches (comma-separated paths or URLs)
+  palette:
+    type: text
+    description: A chosen palette (e.g. output of the palettes workflow, or hex values)
   brand:
     type: text
-    description: Brand guidance (colours, fonts, tone)
+    description: Brand guidance (fonts, tone, logo usage)
+  design_variants:
+    type: integer
+    default: 1
+    description: How many distinct design directions to explore (you pick one at the checkpoint)
+  directions:
+    type: text
+    description: Optional creative direction per variant, one per line
   stack:
     type: text
-    description: Technology choices; defaults to vanilla HTML/CSS/JS
+    description: Technology choices; defaults to the house style
 
 steps:
   - id: spec
     agent: product_planner
     inputs:
       brief: ${inputs.brief}
+      industry: ${inputs.industry}
       references: ${inputs.references}
 
   - id: design
@@ -29,13 +46,19 @@ steps:
     inputs:
       brief: ${inputs.brief}
       spec: ${steps.spec.handoff}
+      industry: ${inputs.industry}
       references: ${inputs.references}
+      palette: ${inputs.palette}
       brand: ${inputs.brand}
+    variants:
+      count: ${inputs.design_variants}
+      directions: ${inputs.directions}
     review:
       agent: design_reviewer
       max_rounds: 3
       inputs:
         brief: ${inputs.brief}
+        industry: ${inputs.industry}
         references: ${inputs.references}
 
   - id: build
