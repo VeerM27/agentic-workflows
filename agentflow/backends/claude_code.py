@@ -58,8 +58,14 @@ def claude_binary() -> str:
     return os.environ.get("AGENTFLOW_CLAUDE_BIN", "claude")
 
 
+# When agentflow itself is started from inside a Claude Code session, these would pull that
+# session's extra directories and their CLAUDE.md files into every agent.
+PARENT_SESSION_CONTEXT_VARS = ("CLAUDE_ADDITIONAL_DIRECTORIES", "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD")
+
+
 def subscription_env() -> dict[str, str]:
-    env = {k: v for k, v in os.environ.items() if k not in API_CREDENTIAL_VARS}
+    drop = set(API_CREDENTIAL_VARS) | set(PARENT_SESSION_CONTEXT_VARS)
+    env = {k: v for k, v in os.environ.items() if k not in drop}
     # Make the `agentflow` helper command resolvable from inside the session.
     bin_dir = str(Path(sys.executable).parent)
     env["PATH"] = bin_dir + os.pathsep + env.get("PATH", "")
