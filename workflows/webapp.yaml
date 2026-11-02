@@ -1,0 +1,55 @@
+name: webapp
+description: |
+  Brief (+ optional reference images) -> spec -> reviewed designs -> reviewed implementation -> QA report.
+
+inputs:
+  brief:
+    type: text
+    required: true
+    description: What to build. Pass a file with --input brief=@path/to/brief.md
+  references:
+    type: images
+    description: Reference photos, screenshots or sketches (comma-separated paths or URLs)
+  brand:
+    type: text
+    description: Brand guidance (colours, fonts, tone)
+  stack:
+    type: text
+    description: Technology choices; defaults to vanilla HTML/CSS/JS
+
+steps:
+  - id: spec
+    agent: product_planner
+    inputs:
+      brief: ${inputs.brief}
+      references: ${inputs.references}
+
+  - id: design
+    agent: ux_designer
+    inputs:
+      brief: ${inputs.brief}
+      spec: ${steps.spec.handoff}
+      references: ${inputs.references}
+      brand: ${inputs.brand}
+    review:
+      agent: design_reviewer
+      max_rounds: 3
+      inputs:
+        brief: ${inputs.brief}
+        references: ${inputs.references}
+
+  - id: build
+    agent: frontend_engineer
+    inputs:
+      spec: ${steps.spec.handoff}
+      design: ${steps.design.handoff}
+      stack: ${inputs.stack}
+    review:
+      agent: code_reviewer
+      max_rounds: 3
+
+  - id: qa
+    agent: qa_tester
+    inputs:
+      spec: ${steps.spec.handoff}
+      build: ${steps.build.handoff}

@@ -1,0 +1,34 @@
+name: design-only
+description: |
+  Design one or more pages from text and/or images, with a design-principles check loop.
+  Useful on its own, or to iterate on a look before running the full webapp workflow.
+
+inputs:
+  brief:
+    type: text
+    required: true
+    description: The page(s) to design and what they are for
+  references:
+    type: images
+    description: Photos, screenshots or sketches to take direction from
+  brand:
+    type: text
+    description: Brand guidance
+  checklist:
+    type: text
+    description: Extra criteria the design checker should enforce
+
+steps:
+  - id: design
+    agent: ux_designer
+    inputs:
+      brief: ${inputs.brief}
+      references: ${inputs.references}
+      brand: ${inputs.brand}
+    review:
+      agent: design_reviewer
+      max_rounds: 3
+      inputs:
+        brief: ${inputs.brief}
+        references: ${inputs.references}
+        checklist: ${inputs.checklist}

@@ -1,0 +1,173 @@
+"""Turning workflow/agent arguments (text, files, images) into Claude content blocks."""
+
+from __future__ import annotations
+
+import shutil
+from pathlib import Path
+from typing import Any
+
+from .config import REVIEW_WORK_ARG, InputSpec
+from .tools import IMAGE_MEDIA_TYPES, image_block_from_bytes
+from .workspace import Workspace
+
+
+class InputError(Exception):
+    """A workflow or agent argument is missing or cannot be loaded."""
+
+
+def is_url(ref: str) -> bool:
+    return ref.startswith(("http://", "https://"))
+
+
+def as_list(value: Any) -> list:
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple)):
+        return [v for v in value if v not in (None, "")]
+    if isinstance(value, str):
+        return [part.strip() for part in value.split(",") if part.strip()]
+    return [value]
+
+
+def coerce_workflow_inputs(
+    specs: dict[str, InputSpec], given: dict[str, Any], base_dir: Path
+) -> dict[str, Any]:
+    """Apply defaults, check required inputs, and normalise values by type.
+
+    - text: a string; "@path" reads the string from a file
+    - file: a path to a text file (kept as a path; read when the agent runs)
+    - image / images: one or more local paths or URLs (comma-separated string or list)
+    """
+    unknown = sorted(set(given) - set(specs))
+    if unknown:
+        raise InputError(f"unknown workflow inputs {unknown} (declared: {sorted(specs)})")
+
+    resolved: dict[str, Any] = {}
+    for name, spec in specs.items():
+        value = given.get(name, spec.default)
+        if value in (None, "", []):
+            if spec.required:
+                hint = f" ({spec.description})" if spec.description else ""
+                raise InputError(f"missing required input '{name}'{hint}")
+            continue
+
+        if spec.type == "text":
+            if isinstance(value, str) and value.startswith("@"):
+                path = _local_path(value[1:], base_dir)
+                value = path.read_text(encoding="utf-8")
+            resolved[name] = str(value)
+        elif spec.type == "file":
+            resolved[name] = str(_local_path(str(value), base_dir))
+        else:
+            refs = as_list(value)
+            if spec.type == "image" and len(refs) > 1:
+                raise InputError(f"input '{name}' takes a single image; use type 'images' for several")
+            for ref in refs:
+                if not is_url(str(ref)):
+                    path = _local_path(str(ref), base_dir)
+                    if path.suffix.lower() not in IMAGE_MEDIA_TYPES:
+                        raise InputError(
+                            f"input '{name}': {path.name} is not a supported image "
+                            f"({', '.join(sorted(IMAGE_MEDIA_TYPES))})"
+                        )
+            resolved[name] = [
+                str(ref) if is_url(str(ref)) else str(_local_path(str(ref), base_dir)) for ref in refs
+            ]
+    return resolved
+
+
+def _local_path(ref: str, base_dir: Path) -> Path:
+    path = Path(ref).expanduser()
+    if not path.is_absolute():
+        path = base_dir / path
+    if not path.is_file():
+        raise InputError(f"file not found: {ref}")
+    return path.resolve()
+
+
+def stage_inputs(inputs: dict[str, Any], specs: dict[str, InputSpec], workspace: Workspace) -> dict[str, str]:
+    """Copy local file/image inputs into ``inputs/<name>/`` in the workspace.
+
+    Agents can then reference them (e.g. use a supplied logo in a page) and later
+    agents can read them. Returns {original local path: workspace path}.
+    """
+    staged: dict[str, str] = {}
+    for name, value in inputs.items():
+        spec = specs[name]
+        if spec.type not in ("file", "image", "images"):
+            continue
+        for ref in as_list(value):
+            if is_url(ref):
+                continue
+            src = Path(ref)
+            rel = f"inputs/{name}/{src.name}"
+            dest = workspace.resolve(rel)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(src, dest)
+            staged[str(src)] = rel
+    return staged
+
+
+def _image_block(ref: str) -> dict:
+    if is_url(ref):
+        return {"type": "image", "source": {"type": "url", "url": ref}}
+    path = Path(ref)
+    media_type = IMAGE_MEDIA_TYPES.get(path.suffix.lower())
+    if media_type is None:
+        raise InputError(f"unsupported image type: {path.name}")
+    return image_block_from_bytes(path.read_bytes(), media_type)
+
+
+def build_task_content(
+    agent_inputs: dict[str, InputSpec],
+    args: dict[str, Any],
+    *,
+    staged: dict[str, str] | None = None,
+    instructions: str = "",
+    closing: str = "",
+) -> list[dict]:
+    """Render an agent's arguments as the content of its first user message."""
+    staged = staged or {}
+    blocks: list[dict] = [
+        {"type": "text", "text": "You have been given the following inputs for this task."}
+    ]
+
+    for name, value in args.items():
+        spec = agent_inputs.get(name) or InputSpec(name=name)
+        title = name.replace("_", " ")
+        desc = f" — {spec.description}" if spec.description else ""
+
+        if name == REVIEW_WORK_ARG:
+            blocks.append({"type": "text", "text": f"## Work to review\n\n{value}"})
+        elif spec.type in ("image", "images"):
+            refs = as_list(value)
+            blocks.append({"type": "text", "text": f"## {title}{desc}\n\n{len(refs)} image(s) follow."})
+            for i, ref in enumerate(refs, 1):
+                label = f"Image {i} of {len(refs)}"
+                ws_path = _staged_path(ref, staged)
+                if ws_path:
+                    label += f" (also saved in the workspace at `{ws_path}`)"
+                blocks.append({"type": "text", "text": label})
+                blocks.append(_image_block(ref))
+        elif spec.type == "file":
+            path = Path(value)
+            text = path.read_text(encoding="utf-8")
+            ws_path = _staged_path(str(path), staged)
+            where = f" (workspace: `{ws_path}`)" if ws_path else ""
+            blocks.append(
+                {"type": "text", "text": f"## {title}{desc}\n\nFile `{path.name}`{where}:\n\n```\n{text}\n```"}
+            )
+        else:
+            if isinstance(value, list):
+                value = "\n".join(f"- {v}" for v in value)
+            blocks.append({"type": "text", "text": f"## {title}{desc}\n\n{value}"})
+
+    if instructions:
+        blocks.append({"type": "text", "text": f"## Instructions for this step\n\n{instructions}"})
+    if closing:
+        blocks.append({"type": "text", "text": closing})
+    return blocks
+
+
+def _staged_path(ref: str, staged: dict[str, str]) -> str | None:
+    return staged.get(str(ref))

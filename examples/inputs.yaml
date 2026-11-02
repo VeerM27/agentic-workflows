@@ -1,0 +1,6 @@
+# Example inputs file: agentflow run workflows/webapp.yaml --inputs-file examples/inputs.yaml
+brief: "@examples/habit-tracker-brief.md"
+# references:
+#   - examples/moodboard-1.png
+#   - https://example.com/screenshot.png
+brand: "Soft greens and warm off-white; rounded shapes; Inter for UI text."
