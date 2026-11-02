@@ -1,0 +1,555 @@
+{
+  "version": 1,
+  "workflow": "scroll-landing",
+  "workflow_source": "/home/user/agentic-workflows/workflows/scroll_landing.yaml",
+  "workflow_hash": "b7ae1c6a40da8e296253d88b2cc247c6cf4c51fc29a2da014e84f749d9b43fc0",
+  "project_source": "/home/user/agentic-workflows/agentflow.yaml",
+  "status": "done",
+  "started_at": "2026-11-02T17:12:15+00:00",
+  "updated_at": "2026-11-02T18:09:31+00:00",
+  "inputs": {
+    "idea": "Landing page for this red canvas sneaker: as you scroll, the shoe is built from its materials",
+    "photos": [
+      "/tmp/claude-0/-home-user-agentic-workflows/2d9419cb-28df-5c18-b740-fadc9e417707/scratchpad/trial-inputs/red-sneaker.png"
+    ],
+    "industry": "# Industry: E-commerce & retail\n\n**Audience:** Shoppers comparing products, mostly on mobile, with little patience.\n**Tone of voice:** Brand-led; clear and persuasive without pressure.\n**Typical pages / features:** Home/merchandising, category listing with filters, product detail (gallery, variants, reviews), cart, checkout, account/orders, search.\n**Visual conventions:** Product imagery first, fast scanning grids, prominent price and add-to-cart, trust signals near purchase.\n**Palette tendencies:** Neutral canvas that lets products shine, brand accent for actions; sale colours used sparingly.\n**Trust & compliance:** Clear returns, shipping and pricing (incl. taxes); accessible forms; no fake urgency or hidden costs.\n**Avoid:** Fake countdown timers, cluttered pop-ups, tiny product photos."
+  },
+  "staged": {
+    "/tmp/claude-0/-home-user-agentic-workflows/2d9419cb-28df-5c18-b740-fadc9e417707/scratchpad/trial-inputs/red-sneaker.png": "inputs/photos/red-sneaker.png"
+  },
+  "workspace": "/tmp/claude-0/-home-user-agentic-workflows/2d9419cb-28df-5c18-b740-fadc9e417707/scratchpad/trial/shoe-trial/workspace",
+  "models": {
+    "brief_reviewer": "claude-sonnet-5-5",
+    "final_reviewer": "claude-sonnet-5-5",
+    "landing_coder": "claude-opus-5-5",
+    "landing_designer": "claude-opus-5-5",
+    "page_checker": "claude-sonnet-5-5",
+    "planner": "claude-sonnet-5-5",
+    "security_reviewer": "claude-sonnet-5-5"
+  },
+  "skills": {
+    "brief-review": "local",
+    "frontend-design": "ca45fc496a3436251f191354091d557da31c15b5",
+    "svg-scroll-animation": "local",
+    "theme-factory": "ca45fc496a3436251f191354091d557da31c15b5",
+    "web-security-checklist": "local"
+  },
+  "preflight": {
+    "usage": {
+      "input_tokens": 6,
+      "output_tokens": 3097,
+      "cache_creation_input_tokens": 19815,
+      "cache_read_input_tokens": 22256,
+      "requests": 1
+    },
+    "status": "done",
+    "report": "# Skill audit\n\nNo upstream updates are available. Five of the skill attachments need changes. theme-factory is the clearest problem: it is interactive, built for slide decks, and conflicts with the house style. frontend-design is attached to two agents that don't make design decisions. svg-scroll-animation has a file layout and an animation property list that clash with the pipeline. The coder and checker are also missing coverage in a few places.\n\n## Upstream updates\n\n- none\n\n## Findings\n\n1. [major] landing_designer / theme-factory: The skill is written for interactive slide decks. It tells the agent to show theme-showcase.pdf, ask the user which theme they want, and wait for confirmation. A pipeline agent can't do that, so it will stall or invent an answer. The 10 preset themes (Ocean Depths, Tech Innovation, etc.) are generic palettes. They contradict the house style (\"avoid generic SaaS templates\", \"made for its client\") and frontend-design's push for a distinctive identity. The skill also names colours and fonts by hue or theme rather than role, and doesn't say how it fits with tokens.css. Its custom-theme path is redundant with frontend-design's token planning.\n   Fix: Remove theme-factory from landing_designer. The designer's own instructions and frontend-design already cover tokens, palette and type, and the designer should derive them from the brief.\n2. [major] landing_coder / frontend-design: The coder's instructions say to implement `design/` faithfully. frontend-design tells the agent to brainstorm its own palette, type and layout, critique it against the brief, and revise before building. It also says to confirm the subject with the client. That invites the coder to redesign, drifting from the designer's frames and tokens. The skill's ~9KB is also mostly irrelevant to implementation.\n   Fix: Remove frontend-design from landing_coder. If CSS-craft guidance is wanted, add a short implementation-focused skill instead: specificity pitfalls, focus states, responsive checks.\n3. [major] planner / frontend-design: The planner writes an implementation plan and doesn't design. The skill pushes it toward making aesthetic decisions (palette hex values, typefaces, ASCII wireframes), which belong to landing_designer. That risks the plan over-specifying or conflicting with the designer, and it adds ~9KB of context for little value. The skill's \"confirm with the client\" step also can't be done here.\n   Fix: Remove frontend-design from planner. Keep it only on landing_designer.\n4. [major] landing_designer, landing_coder, page_checker / svg-scroll-animation: The skill's \"File layout for a deliverable\" prescribes `animations/<name>/` with `fallback.js` and a demo page. This conflicts with the plan's layout (`design/svg/`, `site/index.html`, `site/scroll.js`) and with the house style's rule of one README per deliverable folder. Its standards list also allows `clip-path` to be animated, while the house style allows only transform, opacity and SVG stroke/fill. The checker would be told to accept a property that its own performance check should flag.\n   Fix: Keep the skill on the designer, coder and checker, because the techniques are useful. Edit the local skill to drop or neutralise the file-layout section, so it defers to plan.md paths and the file names given in the agent instructions. Also change the animated-properties standard to match the house style (transform, opacity, stroke-dashoffset, fill/stroke), or tell the agents that the house style wins.\n5. [minor] landing_coder / svg-scroll-animation (redundancy): The coder's instructions already state the CSS scroll-timeline-plus-JS-fallback approach, reduced motion and readable-without-animation. The skill repeats these.\n   Fix: Accept the overlap, or trim the repeated guidance from the coder's instructions and point to the skill. This is low priority.\n6. [minor] landing_coder / web-security-checklist (gap): The security reviewer will block on things the coder can't see: no inline handlers, no innerHTML, a CSP-compatible structure, self-hosted assets, and EXIF stripped from the photos in `site/assets`. The coder has no skill on these, which risks rework cycles.\n   Fix: Attach web-security-checklist to landing_coder, or add a short list of these rules to the coder's instructions.\n7. [minor] page_checker (gap): The checker is held to WCAG 2.2 AA, contrast and keyboard checks, but its only skill is svg-scroll-animation. No skill covers accessibility auditing or responsive/performance checking.\n   Fix: Add an accessibility and QA checklist skill (WCAG 2.2 AA, focus order, reduced motion, contrast pairs, 360\u20131440px). Alternatively, spell these checks out in the agent instructions.\n8. [minor] security_reviewer / web-security-checklist: The skill says to use a `<meta http-equiv=CSP>` fallback and lists `frame-ancestors` in the policy. `frame-ancestors` is ignored in a meta tag, and the skill doesn't say so. The reviewer's recommended CSP could therefore mislead.\n   Fix: Add a note to the skill that `frame-ancestors`, `report-uri` and `sandbox` only work as HTTP headers. This is optional.",
+    "report_path": "/tmp/claude-0/-home-user-agentic-workflows/2d9419cb-28df-5c18-b740-fadc9e417707/scratchpad/trial/shoe-trial/preflight/skill-audit.md",
+    "updatable": []
+  },
+  "steps": [
+    {
+      "id": "brief",
+      "agent": "brief_reviewer",
+      "status": "done",
+      "chosen": "main",
+      "approved_by": "auto",
+      "seconds": 66.7,
+      "error": null,
+      "lanes": [
+        {
+          "key": "main",
+          "workspace": "/tmp/claude-0/-home-user-agentic-workflows/2d9419cb-28df-5c18-b740-fadc9e417707/scratchpad/trial/shoe-trial/workspace",
+          "direction": null,
+          "status": "done",
+          "rounds": 1,
+          "result": {
+            "agent": "brief_reviewer",
+            "role": "producer",
+            "summary": "I wrote `docs/brief-review.md` and `docs/brief.md`. The review covers what is clear and what is missing, the risks, fixes and suggestions, a photo assessment, and nine operator questions with the default I assumed for each. The brief defines a short, skippable 5-stage scroll build (sole, toe cap and sidewall, canvas upper, insole, eyelets and laces). It ends in a gallery of the six views and a buy block, with a sticky add-to-cart on mobile. A reduced-motion fallback shows the same stages as a static list. The photo is a 6-view illustration sheet on white at low resolution, not a photo, so the build is a layered exploded-view made by slicing and masking it. Placeholders (name \"Ember Low\", 69 EUR, sizes EU 36\u201346, returns and delivery terms) are all marked **Assumption**.",
+            "files": [
+              "docs/brief-review.md",
+              "docs/brief.md"
+            ],
+            "notes": "- **Image size not measured.** I couldn't measure the image's pixel dimensions because my first Bash call was denied and I had no other way to read them. The roughly 600 px width is an estimate from how the image rendered. Check the real size before slicing.\n- **Contrast not checked.** I did not run `agentflow contrast` or any screenshot helper. The brief lists the palette as a direction only, so the designer should verify the red, white and tan combinations before finalising.\n- **Image source: `inputs/photos/red-sneaker.png`.**\n  - It is a 2\u00d73 sheet on a white background. Top row: side profile, front 3/4 high. Middle row: top-down, back. Bottom row: rear 3/4, front 3/4 low.\n  - It has no logos or watermarks, and the lighting is consistent across views.\n  - It needs masking or cut-out before use on a non-white surface.\n  - It looks like a stock-site asset, and the shoe resembles a famous branded silhouette. Keep brand names out of the copy and have the operator confirm image rights.\n- **Operator confirmations before launch.** Brand name, price, sizes, returns and delivery terms, and material wording are all placeholders. Don't present them as real. Put a short \"placeholder content\" note in the README.\n- **Scope calls.** The build is illustrative and 2D only. It is not 3D or WebGL. The page is a landing page with a demo add-to-cart, not a shop. Keep the build to about 3\u20134 screen heights on mobile, and never make it the only route to the buy block.",
+            "verdict": null,
+            "issues": [],
+            "turns": 1,
+            "usage": {
+              "input_tokens": 8,
+              "output_tokens": 7665,
+              "cache_creation_input_tokens": 18229,
+              "cache_read_input_tokens": 33147,
+              "requests": 1
+            }
+          },
+          "reviews": [],
+          "human_feedback": [],
+          "usage": {
+            "input_tokens": 8,
+            "output_tokens": 7665,
+            "cache_creation_input_tokens": 18229,
+            "cache_read_input_tokens": 33147,
+            "requests": 1
+          },
+          "error": null,
+          "phase": "producer"
+        }
+      ]
+    },
+    {
+      "id": "plan",
+      "agent": "planner",
+      "status": "done",
+      "chosen": "main",
+      "approved_by": "auto",
+      "seconds": 260.2,
+      "error": null,
+      "lanes": [
+        {
+          "key": "main",
+          "workspace": "/tmp/claude-0/-home-user-agentic-workflows/2d9419cb-28df-5c18-b740-fadc9e417707/scratchpad/trial/shoe-trial/workspace",
+          "direction": null,
+          "status": "done",
+          "rounds": 1,
+          "result": {
+            "agent": "planner",
+            "role": "producer",
+            "summary": "I wrote `docs/plan.md` with all five required parts: overview and technical approach, a 7-stage scroll storyboard with ranges and copy, an asset plan, one section per agent (Designer, Coder, Checker, Security, Final review) and a risk table. It follows the brief's five-stage build. I could not measure the image, so the sheet size and view boxes are estimates for the designer and coder to verify. Key decisions:\n- **One scroll variable.** The build reads a single `--p` (0\u20131) custom property. A CSS scroll-timeline drives it where supported and a rAF JS fallback elsewhere. Both use the same layer rules, and `?driver=js` and `?build=static` are test hooks.\n- **Pinned track.** It is 400 svh tall (300 svh of scroll). Storyboard stages: opening 0\u20138%, sole 8\u201324%, toe cap and sidewall 24\u201340%, canvas upper 40\u201360%, insole 60\u201378%, eyelets and laces 78\u201394%, settle 94\u2013100%.\n- **Layers need no image tools.** Each layer is the sheet's side view cut by a `clip-path` polygon, with one multiply blend on a light stage panel to remove the white background. The insole comes from the top-down view and floats foreshortened, then sinks behind the upper. The stage panel stays light in dark mode.\n- **Reduced motion.** It gets a static list of five figures, each the same component with `--p` fixed to a snap value.\n- **Resolution cap.** The shoe is never shown wider than 560 CSS px, because the source views are only about 310 px wide.\n- **Buy path.** The top bar has an always-visible \"Skip to buy\" link and mobile has a sticky add-to-cart bar. The gallery and buy block are merged into one `#product` section so the skip target shows shoe, price and CTA together.\n- **Palette.** I ran `agentflow contrast` on a candidate palette (all AA or better) and put the checked pairs in the Designer section.",
+            "files": [
+              "docs/plan.md"
+            ],
+            "notes": "Start with the Designer section of `docs/plan.md`.\n\n- **Estimates to verify.** The sheet size (about 612\u00d7544) and all view boxes are estimated from the render, not measured. The designer should confirm them in the `layer-map.svg` screenshot before the coder relies on them.\n- **Layer polygons are the riskiest design task.** The designer supplies them in V1-local coordinates (V1 = the top-left side view, 312\u00d7148 box). The sole, sidewall and toe, upper, laces and `upper-fill` polygons must hug the shoe, with no white sheet background inside any of them. The coder converts them to percentage `clip-path` values.\n- **No-tooling route.** The plan assumes there is no image tooling. If PIL or ImageMagick is available, transparent layers are an optional upgrade, not a requirement.\n- **Copying the image.** The coder should `cp` the sheet to `site/assets/`. If no shell is available, reference `../inputs/photos/red-sneaker.png` and say so in the README.\n- **Fonts.** Use system or self-hosted fonts only. Do not hotlink Google Fonts (EU privacy concern, since price is in EUR, and the Security step checks it).\n- **Checker scope.** The checker fixes small defects directly in `site/`, because no coder step follows. They cannot test real devices, real reduced-motion emulation or screen readers, and must say so rather than claim a pass.\n- **Placeholders.** Name Ember Low, 69 EUR, EU 36\u201346, returns, delivery and material wording are all placeholders. Mark them in the footer and README, and flag image rights for the operator. Keep the operator's email out of every file.",
+            "verdict": null,
+            "issues": [],
+            "turns": 1,
+            "usage": {
+              "input_tokens": 10,
+              "output_tokens": 29973,
+              "cache_creation_input_tokens": 43637,
+              "cache_read_input_tokens": 83942,
+              "requests": 1
+            }
+          },
+          "reviews": [],
+          "human_feedback": [],
+          "usage": {
+            "input_tokens": 10,
+            "output_tokens": 29973,
+            "cache_creation_input_tokens": 43637,
+            "cache_read_input_tokens": 83942,
+            "requests": 1
+          },
+          "error": null,
+          "phase": "producer"
+        }
+      ]
+    },
+    {
+      "id": "design",
+      "agent": "landing_designer",
+      "status": "done",
+      "chosen": "main",
+      "approved_by": "auto",
+      "seconds": 1740.5,
+      "error": null,
+      "lanes": [
+        {
+          "key": "main",
+          "workspace": "/tmp/claude-0/-home-user-agentic-workflows/2d9419cb-28df-5c18-b740-fadc9e417707/scratchpad/trial/shoe-trial/workspace",
+          "direction": null,
+          "status": "done",
+          "rounds": 1,
+          "result": {
+            "agent": "landing_designer",
+            "role": "producer",
+            "summary": "The design is ready for the coder in `design/`. The concept is a shoe-maker's spec sheet: the shoe is assembled part by part on a pale drawing sheet laid on a greige page, and each part gets a numbered tag on a leader line. The progress nav is a parts list whose numbered dots match those tags. Red is used only for actions and the current step.\n\nI rendered every frame at 1280 and 375 px and checked each screenshot. At p = 1 the shoe matches the source side view pixel for pixel, with no gaps and no white background showing.\n\nKey decisions:\n- **Source size:** the sheet measures 612\u00d7551 px, read in the browser (the plan estimated 544). All view boxes are measured, and the side-view box the plan estimated was correct.\n- **Layer cut-outs:** five tight polygons, traced on 7\u20139\u00d7 zoomed renders. Where two parts meet, the later part overlaps the earlier one by 0.6 units, which fixed a hairline seam and a red sliver that showed in early renders. A flat fill (#931C25, matched by eye) closes the lace area until the laces arrive.\n- **Frames compute the real build:** each frame sets one progress value (0\u20131) and `frames/frames.css` derives every layer position, outline, stitch, eyelet ring and tag from it. It also carries a blending detail that, if missed, makes the sheet's white background show.\n- **Colours and contrast:** every text and control pair passes WCAG AA or better, with ratios printed by the contrast helper. The drawing sheet stays light in dark mode, and colours inside it are re-pointed, because the dark-mode red fails on it (2.85:1).\n- **Type:** a DIN-style condensed face that ships with Windows, macOS and Android for headings, and the system font for body. No web fonts are downloaded.\n- **Copy:** the final copy, including all six alt texts, has no brand names or unsupported claims.\n- **Deviations from the plan** are listed with reasons in `design-notes.md` section 11. The main ones:\n  - The dashed outline is already drawn at the opening.\n  - Motion values are in % of the shoe box, not px.\n  - The insole is less flattened.\n  - The mobile sticky bar appears only after the build, as the brief says, so it never covers the step dots.\n  - The SVGs are in `design/svg/` and the frames in `design/frames/`.",
+            "files": [
+              "design/README.md",
+              "design/design-notes.md",
+              "design/tokens.css",
+              "design/mockup.html",
+              "design/frames/frames.css",
+              "design/frames/frame.js",
+              "design/frames/stage-0.html",
+              "design/frames/stage-1.html",
+              "design/frames/stage-2.html",
+              "design/frames/stage-3.html",
+              "design/frames/stage-4.html",
+              "design/frames/stage-5.html",
+              "design/frames/stage-6.html",
+              "design/frames/product.html",
+              "design/frames/static-list.html",
+              "design/svg/layer-map.svg",
+              "design/svg/shoe-overlay.svg",
+              "design/svg/contact-shadow.svg",
+              "design/svg/mark.svg",
+              "design/svg/wordmark.svg",
+              "design/svg/favicon.svg",
+              "design/svg/icons.svg",
+              "design/shots/layer-map.png",
+              "design/shots/stage-0-1280.png",
+              "design/shots/stage-0-375.png",
+              "design/shots/stage-1-1280.png",
+              "design/shots/stage-1-375.png",
+              "design/shots/stage-2-1280.png",
+              "design/shots/stage-2-375.png",
+              "design/shots/stage-3-1280.png",
+              "design/shots/stage-3-375.png",
+              "design/shots/stage-4-1280.png",
+              "design/shots/stage-4-375.png",
+              "design/shots/stage-5-1280.png",
+              "design/shots/stage-5-375.png",
+              "design/shots/stage-6-1280.png",
+              "design/shots/stage-6-375.png",
+              "design/shots/product-1280.png",
+              "design/shots/product-375.png",
+              "design/shots/product-375-full.png",
+              "design/shots/sticky-bar-375.png",
+              "design/shots/static-list-1280.png",
+              "design/shots/static-list-375.png",
+              "design/shots/mockup-1440.png",
+              "design/_probe/zoom.js",
+              "design/_probe/measure.html",
+              "design/_probe/zoom-v1.html",
+              "design/_probe/zoom-laces.html",
+              "design/_probe/zoom-low-left.html",
+              "design/_probe/zoom-low-right.html",
+              "design/_probe/zoom-v3.html",
+              "design/_probe/zoom-collar.html",
+              "design/_probe/map-zoom.html",
+              "design/_probe/layer-map.html",
+              "design/_probe/fill-test.html",
+              "design/_probe/fonts.html"
+            ],
+            "notes": "Coder, start here:\n1. Read `design/design-notes.md` sections 3\u20135 and 11.\n2. Copy `design/tokens.css` to `site/css/tokens.css` unchanged.\n3. Lift the `.shoe`, `.shoe__body`, `.shoe__layers`, `.cut`, `.layer*` and `.shoe__overlay` rules from `design/frames/frames.css` verbatim. The clip-path polygons there are the final ones, written in V1 units, and match `design/svg/layer-map.svg`.\n4. Inline `design/svg/shoe-overlay.svg` and `design/svg/contact-shadow.svg`. Use the markup structure that `design/frames/frame.js` stamps out; that file is a helper for the frames only, so do not ship it.\n5. Point the background images at `assets/red-sneaker-sheet.png` instead of `../../inputs/photos/red-sneaker.png`.\n\nMust keep:\n- **Blending backdrop.** `.shoe__body` paints the sheet colour plus `box-shadow: 0 0 0 3rem` in the same colour, and the sheet has `overflow: clip`. Without both, the sheet's white background shows through the shoe.\n- **Layer order:** sole, sidewall-toe, insole, upper (flat fill under the cut-out), laces.\n- **Class hooks, not ids.** The overlay is styled through classes because ids repeat in the static list. Suffix the mask id (`outline-reveal`) per copy, as `frame.js` does.\n- **Re-pointed tokens inside `.sheet`.** In dark mode, red text and the focus ring must use the light values inside the sheet, because the dark-mode red fails on it (2.85:1).\n- **Shoe width cap.** Never show the shoe wider than 560px: `min(560px, 88cqw, 148cqh)` in the stage, and at most native size \u00d7 1.8 in the gallery viewer.\n\nDeviations from the plan that the coder and checker should know (reasons in section 11):\n- The dashed outline is already drawn at p = 0, with an optional one-time 900ms draw-on at load.\n- The intro text fades at 4\u20138% of the scroll.\n- Motion values are percentages of the shoe box, not px.\n- The insole is scaled (.8, .42) and sits fully hidden behind the upper at rest.\n- The mobile sticky bar appears only after the build ends and hides while the real Add to cart button is on screen. The brief says \"after the build\", and showing it earlier would cover the step dots.\n- Static step 5 uses p = 1, the finished shoe.\n- The plan's `design/shoe-outline.svg` is `design/svg/shoe-overlay.svg`, and the plan's root-level SVGs are in `design/svg/`.\n\nNot verified:\n- **Dark mode and reduced motion were never rendered,** because the screenshot helper cannot emulate media queries.\n- **The DIN-style display fonts are missing from the headless renderer,** so the screenshots show a fallback grotesque. Real Windows, Mac and Android devices will render narrower DIN headings.\n- **The plan's 360 and 1440 px widths were not captured as standalone screenshots.** I took screenshots at 1280 and 375 px as my role asked. `design/mockup.html` shows every frame live at 1440 and 360 (scaled to 40%), and `shots/mockup-1440.png` captures it.\n\nBlocked actions:\n- Shell loops, `sed` and multi-step shell commands were blocked by permissions, so every edit was made with the file tools.\n- I could not run `cp` to copy the image to `site/assets/`; that is the coder's job.\n- `design/_probe/` is scratch measurement pages and can be deleted.\n\nOperator items:\n- The name, price, sizes, returns and delivery terms are placeholders.\n- The rights to the sneaker image need confirming.\n- A higher-resolution source would sharpen the desktop hero.",
+            "verdict": null,
+            "issues": [],
+            "turns": 1,
+            "usage": {
+              "input_tokens": 154,
+              "output_tokens": 182900,
+              "cache_creation_input_tokens": 274631,
+              "cache_read_input_tokens": 11227420,
+              "requests": 1
+            }
+          },
+          "reviews": [],
+          "human_feedback": [],
+          "usage": {
+            "input_tokens": 154,
+            "output_tokens": 182900,
+            "cache_creation_input_tokens": 274631,
+            "cache_read_input_tokens": 11227420,
+            "requests": 1
+          },
+          "error": null,
+          "phase": "producer"
+        }
+      ]
+    },
+    {
+      "id": "build",
+      "agent": "landing_coder",
+      "status": "done",
+      "chosen": "main",
+      "approved_by": "auto",
+      "seconds": 899.7,
+      "error": null,
+      "lanes": [
+        {
+          "key": "main",
+          "workspace": "/tmp/claude-0/-home-user-agentic-workflows/2d9419cb-28df-5c18-b740-fadc9e417707/scratchpad/trial/shoe-trial/workspace",
+          "direction": null,
+          "status": "done",
+          "rounds": 1,
+          "result": {
+            "agent": "landing_coder",
+            "role": "producer",
+            "summary": "I built the Ember Low scroll-build landing page in `site/`, following the file layout in the plan's Coder section and the designer's reference build. I checked it in screenshots at 360, 375, 768, 1280 and 1440 px.\n\nDecisions and what I verified:\n- **One scroll number, two drivers.** The shoe component reads one registered property, `--p`. The layer, overlay and callout rules are copied from `design/frames/frames.css` with only the image path changed.\n  - Where the browser supports scroll timelines, a timeline on the 400svh track animates `--p` from 0 to 1. It is offset by the top-bar height and runs only while the stage is pinned.\n  - Elsewhere, `js/build-driver.js` updates `--p` on scroll (one rect read and one property write per frame). It pauses while the track is off screen.\n  - Screenshots at p = .36, .665 and 1 look the same with both drivers. At p = 1 the shoe is complete: no gaps, no missing laces, no white patches.\n- **Scripts are classic, not ES modules.** The screenshot browser blocks module scripts on `file://`, so the build never ran there. The plan also requires `file://` to work. Each JS file is now a small deferred script, and they share one namespace, `window.EmberLow`. This departs from the house style, and the README explains why.\n- **Modes.** The HTML ships in static mode, so visitors without JS get the static list. `boot.js` switches to the pinned build before first paint, unless reduced motion is on or the URL has `?build=static`. It also switches live if the reduced-motion setting changes. If `main.js` has not run by page load, the page falls back to static mode.\n  - Static mode shows five figures with `--p` fixed by class (.20, .36, .58, .665, 1). The two versions are never rendered at the same time.\n- **Progress nav.** Invisible zones match the caption windows, and an observer watches a 1px line under the top bar to set `aria-current` and the checkmarks. Screenshots confirm the current dot matches the visible step. Step links jump to markers placed at each step's snap point (step 5 uses .93).\n- **Product section.**\n  - A six-view viewer cross-fades between views, with `aria-pressed` thumbnails.\n  - Sizes are a fieldset of 11 radio buttons. Choosing no size shows the error, sets `aria-invalid` and focuses the first size.\n  - Adding with a size fills a `role=\"status\"` region, and the button reads \"Added to cart\" for 2 seconds.\n  - On mobile, the sticky bar appears only after the build, and only once the stage has cleared the step dots (my fix: at first it covered them at p = 1). It hides while the real Add to cart button is on screen.\n  - \"Skip to buy\" at 375\u00d7800 shows the name, price, shoe, sizes and Add to cart together (the button ends at about 645px).\n- **Shoe width cap.** I added `--shoe-max` to the product viewer's width formula, because the design's 1.8\u00d7 native size came to 561.6px. On wide screens the shoe measures about 532\u2013554px.\n- **Small polish:** size buttons are capped in width from 600px up so they don't stretch at tablet width.\n- **CSP.** A meta CSP is already in `index.html`, and the page works with it. There are no inline scripts, styles or `style` attributes, no `innerHTML` and no external URLs. `--p` is written through the CSSOM.",
+            "files": [
+              "site/index.html",
+              "site/css/tokens.css",
+              "site/css/base.css",
+              "site/css/build.css",
+              "site/css/product.css",
+              "site/js/boot.js",
+              "site/js/main.js",
+              "site/js/build-driver.js",
+              "site/js/build-nav.js",
+              "site/js/product.js",
+              "site/assets/red-sneaker-sheet.png",
+              "site/assets/favicon.svg",
+              "site/README.md"
+            ],
+            "notes": "Checker, start here:\n- **Converting scroll position to p.** Use p = scrollY / (3 \u00d7 viewport height). The screenshot viewport is 800px tall, so: p .2 = 480, .36 = 864, .58 = 1392, .665 = 1596, .93 = 2232, 1 = 2400. The product section starts at about 3152 (375px wide) or 3144 (1280px wide).\n- **The screenshot tool ignores query strings.** It reports `site/index.html?driver=js` as \"not found\".\n  - To test the JS driver or static mode, I temporarily changed `forceJs` or `forceStatic` in `site/js/boot.js` to `true ||`, took the screenshots, then reverted. Both are reverted now.\n  - Do the same if you need those modes, and revert afterwards.\n  - An iframe harness was unreliable: the initial jump to `#step` anchors scrolls smoothly, and Chrome throttles animation frames in off-screen iframes.\n- **The p = 0 screenshot can show a half-drawn cut line.** This is the one-time 900ms draw-on at page load, specified in the design, not a defect.\n- **Not tested** (the helpers cannot click, type or emulate media queries):\n  - add-to-cart error and success states, the thumbnail switch, keyboard Tab order and focus rings\n  - dark mode and real reduced-motion emulation\n  - screen readers and real devices\n  - DIN fonts (the headless renderer falls back to a grotesque)\n  - checked only by reading the code: no horizontal overflow; `body` also has `overflow-x: clip`.\n- **Deviations from the plan or design:**\n  - (a) Classic deferred scripts instead of ES modules, for `file://` support (reason in the README).\n  - (b) The sticky bar appears after the build, not \"from step 1\", following the design. It waits until the end marker is 96px into the viewport, so it never covers the step dots.\n  - (c) The view-timeline driver checks `animation-timeline: view()`, not `scroll()`.\n  - (d) The cue chevron does not bob, following the design's restraint and motion spec.\n  - (e) The DOM has two h1 elements, one in the pinned build and one in the static list, but only one is ever rendered (the other is `display: none`).\n  - (f) My role brief mentioned `site/styles.css` and `site/scroll.js`. I followed the plan's file list instead (`css/*.css`, `js/build-driver.js` as the fallback).\n- **Environment.** Shell loops are blocked; run commands one at a time and chain them with `&&`. During screenshots the agent proxy logged refused connections to www.google.com. They come from the headless browser itself; no file in `site/` references an external host.\n- **Security.** The CSP meta is already present; the Security step should verify it rather than add it again.\n- **For the operator:** replace the placeholder name, price, sizes and returns/delivery terms; confirm the image rights; a higher-resolution sheet would sharpen the shoe at desktop size.",
+            "verdict": null,
+            "issues": [],
+            "turns": 1,
+            "usage": {
+              "input_tokens": 96,
+              "output_tokens": 91864,
+              "cache_creation_input_tokens": 202463,
+              "cache_read_input_tokens": 6614883,
+              "requests": 1
+            }
+          },
+          "reviews": [],
+          "human_feedback": [],
+          "usage": {
+            "input_tokens": 96,
+            "output_tokens": 91864,
+            "cache_creation_input_tokens": 202463,
+            "cache_read_input_tokens": 6614883,
+            "requests": 1
+          },
+          "error": null,
+          "phase": "producer"
+        }
+      ]
+    },
+    {
+      "id": "check",
+      "agent": "page_checker",
+      "status": "done",
+      "chosen": "main",
+      "approved_by": "auto",
+      "seconds": 328.3,
+      "error": null,
+      "lanes": [
+        {
+          "key": "main",
+          "workspace": "/tmp/claude-0/-home-user-agentic-workflows/2d9419cb-28df-5c18-b740-fadc9e417707/scratchpad/trial/shoe-trial/workspace",
+          "direction": null,
+          "status": "done",
+          "rounds": 1,
+          "result": {
+            "agent": "page_checker",
+            "role": "reviewer",
+            "summary": "Shippable. I made no changes to `site/` and did not write `docs/check-report.md`, because my role is review only; the evidence is below. All files and references exist, with no inline scripts or styles, external URLs, `innerHTML`, storage or network calls. Total weight is about 300 KB.\n\nI checked the scroll story with the native CSS timeline driver at 1280px and 375px, and spot-checked 768, 1024 and 1440. The frames were p = 0, .1, .2, .36, .5, .58, .665, .72, .85 and 1 at 1280, and p = 0, .2, .36, .58, .665, .85 and 1 at 375. Each frame matches the storyboard and `design/shots`:\n- The outline draws on, then the sole rises, the toe cap slides in, the upper drops and the insole hovers, then sinks behind the upper.\n- Eyelets draw, laces drop, and the shoe settles with its contact shadow.\n- At p = 1 the shoe is complete, with no white patches or gaps.\n- The progress dot matches the visible step in every frame, and the finished state matches the source side view.\n\n\"Skip to buy\" at 375\u00d7800 shows the name, price, shoe, sizes and Add to cart together. The sticky bar appears only while the real button is off screen, as planned. No horizontal overflow appears at any width. The shoe never exceeds 560px (about 546px at 1440).\n\nEvery text and UI colour pair passes AA in light and dark, per `agentflow contrast`; the lowest is the 4.30:1 control border against 3:1 required. Only `transform`, `opacity` and `stroke-dashoffset` are derived from `--p`, and the rest of the CSS animates only transforms and opacity. The JS driver reads one rect per frame.\n\nNot tested. A blocked file-copy command stopped me making modified copies of the page, and the screenshot tool ignores query strings and hashes:\n- Static, reduced-motion and no-JS mode, the `?driver=js` fallback, step-link jumps, and the add-to-cart error and success states. I read the code for these and found no defects.\n- Dark mode.\n- Real keyboard Tab order and focus rings, screen readers and real devices.\n- DIN fonts.\n\nThe static-mode `--p` values map correctly to the layer, callout and stitch windows in the CSS.\n\nRemaining items are minor, and the operator can send any to the coder.",
+            "files": [],
+            "notes": "",
+            "verdict": "approve",
+            "issues": [
+              {
+                "severity": "minor",
+                "location": "site/index.html:269 (fieldset.sizes aria-describedby=\"size-error\"); site/js/product.js:53 (aria-invalid on radios)",
+                "problem": "The fieldset always points at the hidden error paragraph. Referenced hidden elements are still read, so screen-reader users hear \"Choose a size to add to cart.\" as the group description before any error. `aria-invalid` is also set on individual radio inputs, where it isn't a supported ARIA attribute.",
+                "fix": "Add `aria-describedby` only in `showError()` and remove it in `clearError()`. Put `aria-invalid` on the fieldset or a `role=\"radiogroup\"` wrapper instead of on each input."
+              },
+              {
+                "severity": "minor",
+                "location": "site/css/build.css:28-36 (--stage-h: max(34rem, 100svh - bar)); .build__sheet height clamp",
+                "problem": "The 34rem (544px) minimum stage height is taller than the viewport on short screens such as phones in landscape, or desktop at 200\u2013400% zoom. The caption and step nav then sit below the fold while the stage is pinned, so the step links are hard to reach. Skip to buy still works.",
+                "fix": "Drop the 34rem minimum, or on short viewports (`@media (max-height: 34rem)`) shrink `.build__sheet` and reduce the stage gaps. Alternatively, in that case let the stage unpin and stack normally."
+              },
+              {
+                "severity": "minor",
+                "location": "site/assets/red-sneaker-sheet.png; --shoe-max in site/css/tokens.css",
+                "problem": "The source views are about 310px wide and are shown up to about 546px, so about 1.75\u00d7 upscaled on desktop and more than 2.5\u00d7 on 2\u20133\u00d7 phones. The hero and product shots are visibly soft. The brief's \"looks sharp at displayed sizes\" is only partly met, a limit of the supplied image that the plan accepted. The 214 KB PNG could also be smaller as WebP.",
+                "fix": "Operator action: supply a higher-resolution sheet. The README already explains the swap and the `--shoe-max` change. Optionally convert the sheet to WebP if tooling is available."
+              },
+              {
+                "severity": "minor",
+                "location": "site/css/base.css .topbar vs site/css/build.css .build__stage (max-width: var(--page-max))",
+                "problem": "At 1440px the top bar spans the full width (wordmark at x\u224838, Skip to buy at x\u22481403), while the page content is centred at 84rem (text at x\u224884, sheet ends at x\u22481356). The header and content edges don't line up on wide screens.",
+                "fix": "Give `.topbar` the same `max-width: var(--page-max); margin-inline: auto` inner container, or align the content gutters to the bar."
+              },
+              {
+                "severity": "minor",
+                "location": "site/css/build.css `.layer--sidewall-toe` clip-path (around p = .36, 1280px)",
+                "problem": "A thin pinkish line is faintly visible along the top edge of the white sidewall band when it lands. Red pixels from the upper's lower edge fall inside the sidewall polygon. It disappears under the upper, so it is cosmetic.",
+                "fix": "Nudge the top edge of the sidewall polygon (the y \u2248 110\u2013111 points) down about 0.5 V1 units, and compare it at p = .36."
+              }
+            ],
+            "turns": 1,
+            "usage": {
+              "input_tokens": 38,
+              "output_tokens": 29453,
+              "cache_creation_input_tokens": 125988,
+              "cache_read_input_tokens": 1530953,
+              "requests": 1
+            }
+          },
+          "reviews": [],
+          "human_feedback": [],
+          "usage": {
+            "input_tokens": 38,
+            "output_tokens": 29453,
+            "cache_creation_input_tokens": 125988,
+            "cache_read_input_tokens": 1530953,
+            "requests": 1
+          },
+          "error": null,
+          "phase": "producer"
+        }
+      ]
+    },
+    {
+      "id": "security",
+      "agent": "security_reviewer",
+      "status": "done",
+      "chosen": "main",
+      "approved_by": "auto",
+      "seconds": 55.0,
+      "error": null,
+      "lanes": [
+        {
+          "key": "main",
+          "workspace": "/tmp/claude-0/-home-user-agentic-workflows/2d9419cb-28df-5c18-b740-fadc9e417707/scratchpad/trial/shoe-trial/workspace",
+          "direction": null,
+          "status": "done",
+          "rounds": 1,
+          "result": {
+            "agent": "security_reviewer",
+            "role": "reviewer",
+            "summary": "No blockers or majors. The page makes no requests to other origins. It has no inline scripts, styles or event handlers, and nothing in it injects HTML, runs eval, or uses cookies or storage. It makes no network calls, and no email address, key or internal URL appears in `site/`, `docs/` or the README. `?driver` and `?build` are only compared to fixed strings in `site/js/boot.js:16-17` and never written into the DOM. The page has no `<form>`, no external links (so no `target=\"_blank\"`), no iframes, no `package.json` and no source maps. The meta CSP in `site/index.html:6` fits the page: every `url()` in the CSS is the same-origin sheet, the SVG `<use>` and `<mask>` references are same-document, and `--p` is set through the CSSOM, which `style-src 'self'` allows. The remaining issues are hardening items, listed below.\n\nShell access was denied in this session, so I did not check the PNG for EXIF/XMP metadata with a tool. A text search of `site/assets` found no Exif, XMP, GPS or author strings, but that search may skip binary files, so the metadata check is unconfirmed. I did not run a live CSP test in a browser, test dark mode, or test keyboard or screen-reader use. My review rests on reading the code and on the coder's screenshots.\n\n**Recommended CSP (send as a response header, keep the meta tag as a fallback):**\n`Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'none'; manifest-src 'none'; object-src 'none'; media-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests`\n\nThe page loads no data: URIs, so `data:` can be dropped from `img-src`. If the operator later adds a real checkout, change `form-action` and `connect-src` to that exact origin only.\n\n**Other headers the host should send:** `Strict-Transport-Security: max-age=31536000; includeSubDomains`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, and `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()`. Optionally add `Cross-Origin-Opener-Policy: same-origin`.\n\n**Operator actions:** confirm the rights to the sneaker image and strip its metadata before publishing. The product name, price, returns and delivery wording are placeholders, and the footer says so. The \"Free returns within 30 days\" and \"Delivered in 2 to 4 working days\" lines are still stated as fact and should be replaced or confirmed before launch.",
+            "files": [],
+            "notes": "",
+            "verdict": "approve",
+            "issues": [
+              {
+                "severity": "minor",
+                "location": "site/index.html:6 (meta CSP) and the host configuration",
+                "problem": "`frame-ancestors` is ignored in a meta CSP, and so are `Strict-Transport-Security`, `X-Content-Type-Options` and `Referrer-Policy` set this way. Until the host sends them as headers, the page could be framed for clickjacking and is not forced onto HTTPS. The README notes this for `frame-ancestors` only.",
+                "fix": "Have the host send the full header set from the summary: the CSP including `frame-ancestors 'none'`, HSTS, nosniff, the Referrer-Policy and a Permissions-Policy. Extend the README's CSP section to list all of them."
+              },
+              {
+                "severity": "minor",
+                "location": "site/index.html:6 (`img-src 'self' data:`)",
+                "problem": "`data:` is allowed for images but nothing in the page uses it. Allowing it widens the policy for no reason.",
+                "fix": "Change to `img-src 'self'`, and make the same change in the README's CSP section. Also add `connect-src 'none'`, `object-src 'none'` and `frame-src 'none'` for explicit denial. `default-src 'none'` already blocks them, so this is only a clearer policy."
+              },
+              {
+                "severity": "minor",
+                "location": "site/assets/red-sneaker-sheet.png",
+                "problem": "I could not confirm the file has no embedded metadata (EXIF, XMP or text chunks such as author, software or GPS). The text search found nothing, but I could not run a metadata tool. The README also says the file is a byte-for-byte copy of the input, so any metadata in the input would have shipped.",
+                "fix": "Before publishing, run a metadata tool on the file, for example `exiftool -all= red-sneaker-sheet.png`, or re-save it with a PNG optimiser that drops ancillary chunks. Check the result with `exiftool`. Note in the README that this was done."
+              },
+              {
+                "severity": "minor",
+                "location": "site/index.html:12-13 and site/js/boot.js:44-46 (resilience)",
+                "problem": "`js/boot.js` is a blocking script in `<head>`. It uses `window.EmberLow`, which the deferred scripts create, only indirectly through `data-ready`, so the fallback depends on the `load` event. If the sheet image is slow or fails, `load` can be delayed. Until then the page stays in pinned mode, and if a deferred script failed, the pinned stage is not driven. This is a robustness issue, not a vulnerability.",
+                "fix": "Optionally have `boot.js` also check `data-ready` on `DOMContentLoaded` or after a short timeout, not only on `load`. Not required for publishing."
+              },
+              {
+                "severity": "minor",
+                "location": "site/index.html:290-293 and site/index.html:310 (copy)",
+                "problem": "The return and delivery promises are stated as fact in the page body. Only the footer says they are placeholders. A visitor could read them as real commitments, and they could have consumer-law implications if the page went live unchanged.",
+                "fix": "Keep the footer notice, and replace the two terms with confirmed wording or remove them before launch. Add the operator's legal, privacy and returns links once they exist. The page currently sets no cookies and has no analytics, so no consent banner is needed. Add one if analytics are added later."
+              }
+            ],
+            "turns": 1,
+            "usage": {
+              "input_tokens": 16,
+              "output_tokens": 5097,
+              "cache_creation_input_tokens": 39814,
+              "cache_read_input_tokens": 231417,
+              "requests": 1
+            }
+          },
+          "reviews": [],
+          "human_feedback": [],
+          "usage": {
+            "input_tokens": 16,
+            "output_tokens": 5097,
+            "cache_creation_input_tokens": 39814,
+            "cache_read_input_tokens": 231417,
+            "requests": 1
+          },
+          "error": null,
+          "phase": "producer"
+        }
+      ]
+    },
+    {
+      "id": "final",
+      "agent": "final_reviewer",
+      "status": "done",
+      "chosen": "main",
+      "approved_by": "auto",
+      "seconds": 55.9,
+      "error": null,
+      "lanes": [
+        {
+          "key": "main",
+          "workspace": "/tmp/claude-0/-home-user-agentic-workflows/2d9419cb-28df-5c18-b740-fadc9e417707/scratchpad/trial/shoe-trial/workspace",
+          "direction": null,
+          "status": "done",
+          "rounds": 1,
+          "result": {
+            "agent": "final_reviewer",
+            "role": "reviewer",
+            "summary": "Release note: \"Ember Low\" is a single-page landing site in `site/`. It has a pinned scroll sequence of about 3\u20134 screens, where the red canvas sneaker is built in five steps (sole, toe cap and sidewall, canvas upper, insole and lining, eyelets and laces). It then reaches a buy section with a six-view viewer, EU 36\u201346 size picker, add-to-cart, a trust block and a mobile sticky bar. The brief's scroll story is delivered, and the finished shoe is complete and clean. I checked frames rendered at 1280px (p = 0, .36, 1 and the product section) and 375px (top, step 4, product). Each frame matched the storyboard, the progress dot matched the visible step, and nothing overflowed. On mobile, \"Skip to buy\" shows the name, price, shoe, sizes and Add to cart together. Copy matches the brief, with no invented claims, brand names, timers or pop-ups. The checker and security reviews both approved with only minor items, none of which blocks publishing. I could not test add-to-cart states, keyboard focus, dark mode, reduced-motion emulation, screen readers or real devices, and neither could the earlier reviewers. Look first at the build at scroll positions around 860px (toe cap landing) and 2400px (finished shoe), then tap \"Skip to buy\". Known limits: the supplied sheet is only about 310px per view, so the shoe is visibly soft at desktop size (a higher-resolution sheet would fix it). The scripts are classic deferred scripts, not ES modules, so the page also works from `file://`. The README documents this. Before launch, the operator must replace the placeholders (name, 69 EUR, sizes, returns and delivery wording), confirm image rights, and strip image metadata. The host must send the security headers, because a meta CSP does not cover `frame-ancestors`, HSTS or nosniff.",
+            "files": [],
+            "notes": "",
+            "verdict": "approve",
+            "issues": [
+              {
+                "severity": "minor",
+                "location": "site/index.html:290-293 (returns and delivery terms) and :310 (footer)",
+                "problem": "\"Free returns within 30 days\" and \"Delivered in 2 to 4 working days\" are stated as fact. Only the footer says they are placeholders, so a visitor could read them as real commitments.",
+                "fix": "Before launch, replace them with confirmed terms or remove them. Keep the footer placeholder notice until then."
+              },
+              {
+                "severity": "minor",
+                "location": "site/index.html:6 (meta CSP) and the host configuration",
+                "problem": "The meta CSP allows `data:` images, which nothing uses. `frame-ancestors`, HSTS, nosniff and Referrer-Policy have no effect when set in a meta tag.",
+                "fix": "Change to `img-src 'self'`. Have the host send the full header set from `reports/security.md`, and list it in the README."
+              },
+              {
+                "severity": "minor",
+                "location": "site/assets/red-sneaker-sheet.png",
+                "problem": "Image metadata could not be checked, and the source views are about 310px wide, shown up to about 546px, so the shoe is soft on desktop and high-density phones. Image rights are unconfirmed.",
+                "fix": "Operator action: confirm rights, strip metadata, and supply a higher-resolution sheet if possible (the README explains the `--shoe-max` change)."
+              },
+              {
+                "severity": "minor",
+                "location": "site/index.html:269 and site/js/product.js:53",
+                "problem": "The size fieldset always has `aria-describedby` pointing at the hidden error text, and `aria-invalid` is set on individual radio inputs, where it is not supported.",
+                "fix": "Add `aria-describedby` only while the error shows. Put `aria-invalid` on the fieldset or a `role=radiogroup` wrapper."
+              },
+              {
+                "severity": "minor",
+                "location": "site/css/build.css:28-36 (--stage-h minimum of 34rem)",
+                "problem": "The 34rem minimum stage height is taller than short viewports (landscape phones, high zoom), so the caption and step nav can fall below the fold while pinned. Skip to buy still works.",
+                "fix": "Add a short-viewport media query that shrinks the stage, or drop the minimum."
+              },
+              {
+                "severity": "minor",
+                "location": "site/css/base.css .topbar vs site/css/build.css .build__stage",
+                "problem": "At 1440px the top bar spans the full width while the content is centred at 84rem, so the edges do not line up.",
+                "fix": "Give the top bar the same max-width and centring as the page content."
+              },
+              {
+                "severity": "minor",
+                "location": "site/css/build.css .layer--sidewall-toe clip-path (around p = .36)",
+                "problem": "A faint pink line shows along the top of the sidewall band as it lands. It is cosmetic and disappears under the upper.",
+                "fix": "Nudge the top edge of the sidewall polygon down about 0.5 V1 units."
+              }
+            ],
+            "turns": 1,
+            "usage": {
+              "input_tokens": 12,
+              "output_tokens": 4453,
+              "cache_creation_input_tokens": 38715,
+              "cache_read_input_tokens": 138576,
+              "requests": 1
+            }
+          },
+          "reviews": [],
+          "human_feedback": [],
+          "usage": {
+            "input_tokens": 12,
+            "output_tokens": 4453,
+            "cache_creation_input_tokens": 38715,
+            "cache_read_input_tokens": 138576,
+            "requests": 1
+          },
+          "error": null,
+          "phase": "producer"
+        }
+      ]
+    }
+  ]
+}
