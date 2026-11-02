@@ -21,7 +21,10 @@ description: Security and privacy checklist for static and front-end web pages (
   `style-src`, `script-src`; no `'unsafe-inline'`/`'unsafe-eval'` unless unavoidable; `frame-ancestors`,
   `base-uri 'self'`, `form-action`.
 - `Referrer-Policy: strict-origin-when-cross-origin`, `X-Content-Type-Options: nosniff`, HTTPS only (HSTS).
-- A `<meta http-equiv="Content-Security-Policy">` fallback where headers can't be set.
+- A `<meta http-equiv="Content-Security-Policy">` fallback where headers can't be set. Note that
+  `frame-ancestors`, `report-uri`/`report-to` and `sandbox` are ignored in a meta CSP, and HSTS,
+  `X-Content-Type-Options` and `Referrer-Policy` only work as real HTTP headers: say which settings the
+  host must send.
 
 ## Links, forms and embeds
 - `target="_blank"` links have `rel="noopener noreferrer"`.

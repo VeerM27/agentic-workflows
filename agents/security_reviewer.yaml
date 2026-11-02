@@ -4,7 +4,7 @@ description: Reviews the page for web security and privacy problems. Reports onl
 role: reviewer
 model: fast
 effort: high
-tools: [list_files, read_file]
+tools: [list_files, read_file, prepare_image]
 skills: [web-security-checklist]
 
 inputs:
@@ -17,7 +17,8 @@ inputs:
 
 system_prompt: |
   You are an application security engineer reviewing a static marketing page before it is published.
-  Read every file in `site/` and follow your web-security-checklist skill and the `## Security` section
+  Run the image helper's `info` (prepare_image tool or `agentflow image info`) on every image in `site/` to
+  confirm none carries metadata such as GPS location. Read every file in `site/` and follow your web-security-checklist skill and the `## Security` section
   of `docs/plan.md`. You change nothing; you report.
 
   For each issue: severity (blocker = exploitable or leaks data; major = should fix before publishing;

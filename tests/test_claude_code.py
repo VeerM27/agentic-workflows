@@ -103,6 +103,8 @@ def test_runner_uses_subscription_session_and_resumes(tmp_path, fake_claude):
     assert argv[argv.index("--model") + 1] == "claude-opus-5-5"
     assert "Write" in argv[argv.index("--tools") + 1]
     assert "Bash(agentflow screenshot *)" in argv[argv.index("--allowedTools") + 1]
+    assert "Bash(agentflow image *)" in argv[argv.index("--allowedTools") + 1]
+    assert "agentflow image export" in argv[argv.index("--append-system-prompt") + 1]
     assert "Open `inputs/photos/shoe.jpg` with the Read tool" in first["prompt"]
     # skills: preloaded in the system prompt, folders readable
     system = argv[argv.index("--append-system-prompt") + 1]
@@ -118,6 +120,9 @@ def test_reviewer_cannot_write(tmp_path, fake_claude):
     runner.start([{"type": "text", "text": "review"}])
     argv = fake_claude.calls()[0]["argv"]
     assert argv[argv.index("--tools") + 1] == "Read,Glob,Grep,Bash"
+    allowed = argv[argv.index("--allowedTools") + 1]
+    assert "Bash(agentflow image info *)" in allowed and "Bash(agentflow image *)" not in allowed
+    assert "agentflow image export" not in argv[argv.index("--append-system-prompt") + 1]
 
 
 def test_invalid_handoff_is_corrected_in_the_same_session(tmp_path, fake_claude):
@@ -213,6 +218,10 @@ def test_scroll_landing_end_to_end_with_fix_routing(tmp_path, fake_claude):
     assert models["landing_coder"] == "claude-opus-5-5" and models["page_checker"] == "claude-sonnet-5-5"
     assert all(not c["api_key_present"] for c in fake_claude.calls())
     assert any("agentflow serve" in line for line in out)
+    # Claude Code's reported cost (0.01 per call in the fake) is summed and shown.
+    calls = len(fake_claude.calls())
+    assert result.usage.cost_usd == pytest.approx(0.01 * calls)
+    assert any(f"≈ ${0.01 * calls:,.2f} at API list prices" in line for line in out)
     state = json.loads((result.run_dir / "run.json").read_text())
     assert state["preflight"]["status"] == "done"
     assert state["steps"][4]["lanes"][0]["human_feedback"] == ["Fix every issue in the report."]
@@ -341,3 +350,33 @@ def test_contrast_command(capsys):
 
     assert main(["contrast", "#777", "#fff"]) == 0
     assert "4.48:1" in capsys.readouterr().out
+
+
+def test_agent_skill_assignments_follow_the_skill_audit():
+    agents = load_agents(ROOT / "agents")
+    assert agents["landing_designer"].skills == ["frontend-design", "svg-scroll-animation"]
+    assert agents["planner"].skills == []
+    assert agents["landing_coder"].skills == ["svg-scroll-animation", "web-security-checklist"]
+    assert "accessibility-qa-checklist" in agents["page_checker"].skills
+    for name in ("landing_coder", "landing_designer", "brief_reviewer", "security_reviewer"):
+        assert "prepare_image" in agents[name].tools
+
+
+def test_old_run_files_without_cost_still_resume(tmp_path, fake_claude):
+    fake_claude.script(landing_script(page_checker=[verdict("approve")]))
+    wf = load_workflow(ROOT / "workflows" / "scroll_landing.yaml")
+    decisions = [Decision("approve")] * 2  # preflight + brief, then pause at plan
+    paused = Orchestrator(wf, project=cc_project(tmp_path), approver=ScriptedApprover(decisions, PauseApprover()),
+                          **QUIET).run({"idea": "x"}, run_id="old")
+    state_path = paused.run_dir / "run.json"
+    state = json.loads(state_path.read_text())
+    for step in state["steps"]:  # simulate a run.json written before cost tracking existed
+        for lane in step["lanes"]:
+            lane["usage"].pop("cost_usd", None)
+            for r in [lane["result"], *lane["reviews"]]:
+                if r:
+                    r["usage"].pop("cost_usd", None)
+    state["preflight"].get("usage", {}).pop("cost_usd", None)
+    state_path.write_text(json.dumps(state))
+    done = Orchestrator.resume(paused.run_dir, project=cc_project(tmp_path), approval_mode="auto", **QUIET)
+    assert done.status == "done"

@@ -4,8 +4,8 @@ description: Designs the landing page and its scroll storyboard as static frames
 role: producer
 model: default
 effort: high
-tools: [list_files, read_file, write_file, edit_file, render_page, check_contrast]
-skills: [frontend-design, theme-factory, svg-scroll-animation]
+tools: [list_files, read_file, write_file, edit_file, render_page, check_contrast, prepare_image]
+skills: [frontend-design, svg-scroll-animation]
 
 inputs:
   plan:
@@ -32,5 +32,12 @@ system_prompt: |
   - `design-notes.md`: the visual idea, how each stage transitions to the next, typography and colour
     decisions, mobile behaviour, and anything the coder must keep exactly.
 
-  Check contrast of every text/background pair (check_contrast tool or `agentflow contrast`), and look
-  at your frames rendered at 1280px and 375px wide before handing off.
+  Work with the real photos: inspect them first (prepare_image / `agentflow image info`), and when a view
+  needs a transparent cut-out or a crop for your frames, make it with the image helper rather than hiding
+  the background with blend modes. Never enlarge a photo beyond its native size; note in the design notes
+  where a higher-resolution original would help.
+
+  Check contrast of every text/background pair (check_contrast tool or `agentflow contrast`). Budget your
+  visual checks: about 6 screenshots in total (key frames at 1280px and 375px), not one per idea. Put any
+  scratch or probe pages in `.scratch/` and delete that folder before handing off; `design/` must contain
+  only deliverables.

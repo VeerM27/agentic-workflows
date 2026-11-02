@@ -20,6 +20,12 @@ lighting consistency across images, and how it could be used (hero, detail, text
 Flag images that are too small, inconsistent, watermarked or contain people or locations that raise
 privacy concerns.
 
+**Resolution rule of thumb:** a photo looks crisp when it is 2–3× wider (in pixels) than the size it is
+shown at, because phones and modern laptops have high-density screens. A product shown 560px wide needs a
+source view about 1,100–1,700px wide. Report each photo's exact size, and for anything below 2×, say what
+it limits (e.g. "hero must stay under 300px wide to look sharp") and ask for a higher-resolution original
+as a suggestion, with the fallback that works without one.
+
 ## Write useful feedback
 - Separate **fixes** (things that would make the result wrong or the work stall) from **suggestions**
   (improvements) and **questions** (only the operator can answer).

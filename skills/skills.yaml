@@ -31,6 +31,10 @@ skills:
     local: local/web-security-checklist
     note: Front-end security and privacy checklist. Used by the security reviewer.
 
+  accessibility-qa-checklist:
+    local: local/accessibility-qa-checklist
+    note: Accessibility, responsive and performance checks. Used by the page checker.
+
   # Add the skills you use, e.g.:
   # my-team-skill:
   #   repo: your-org/claude-skills

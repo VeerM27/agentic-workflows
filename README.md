@@ -112,7 +112,7 @@ A run that crashes, loses its network connection or is interrupted with Ctrl-C r
 | `agentflow skills list\|sync\|update [names]\|verify` | Manage pinned Claude Code skills |
 | `agentflow doctor` | Check Claude Code login, API-key leaks, screenshots, skills |
 | `agentflow serve RUN_DIR` | View a finished page at http://127.0.0.1:8000 |
-| `agentflow screenshot`, `agentflow contrast` | Helpers the agents use (you can too) |
+| `agentflow screenshot`, `agentflow contrast`, `agentflow image …` | Helpers the agents use (you can too) |
 
 ## How it fits together
 
@@ -155,6 +155,7 @@ Input types are `text` (use `@file.md` to read from a file), `integer`, `file`, 
 | `write_file`, `edit_file`, `delete_file` | Change the workspace (paths can't escape it) |
 | `render_page` | Screenshot an HTML file at any width, or at a `scroll_y` position to inspect scroll animations frame by frame (optional `render` extra) |
 | `check_contrast` | Exact WCAG contrast ratios for colour pairs |
+| `prepare_image` | Inspect, crop, resize, cut out plain backgrounds, export 1×/2× WebP with a `srcset`, strip metadata (never enlarges) |
 | `read_skill_file` | Added automatically for agents with skills: read a skill's supporting files |
 
 Producers finish with `complete_task` (summary, files, notes for the next agent). Reviewers finish

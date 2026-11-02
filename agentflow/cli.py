@@ -210,6 +210,34 @@ def cmd_screenshot(args) -> int:
     return 0
 
 
+def cmd_image(args) -> int:
+    from . import images
+
+    root = Path.cwd()
+    try:
+        if args.op == "info":
+            for path in args.paths:
+                print(images.info(path, root).describe())
+        elif args.op == "crop":
+            box = [int(v) for v in args.box.split(",")]
+            if len(box) != 4:
+                raise images.ImageError("--box needs x,y,width,height")
+            print(images.crop(args.src, args.out, tuple(box), root))
+        elif args.op == "resize":
+            print(images.resize(args.src, args.out, args.width, root, allow_upscale=args.allow_upscale))
+        elif args.op == "cutout":
+            print(images.cutout(args.src, args.out, root, tolerance=args.tolerance))
+        elif args.op == "export":
+            widths = [int(w) for w in args.widths.split(",") if w.strip()]
+            print(images.export(args.src, args.out_dir, args.name, widths, root, fmt=args.format))
+        elif args.op == "strip":
+            print(images.strip(args.src, args.out, root))
+    except (images.ImageError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    return 0
+
+
 def cmd_contrast(args) -> int:
     from .tools import ToolError, contrast_ratio
 
@@ -357,6 +385,34 @@ def build_parser() -> argparse.ArgumentParser:
     shot.add_argument("--scroll-y", type=int, help="scroll position in pixels (captures one viewport)")
     shot.add_argument("--full-page", action="store_true", help="capture the whole page (ignored with --scroll-y)")
     shot.set_defaults(func=cmd_screenshot)
+
+    img = sub.add_parser("image", help="prepare images: info, crop, resize, cutout, export, strip (used by agents)")
+    isub = img.add_subparsers(dest="op", required=True)
+    i_info = isub.add_parser("info", help="size, transparency and metadata")
+    i_info.add_argument("paths", nargs="+")
+    i_crop = isub.add_parser("crop", help="crop a box out of an image")
+    i_crop.add_argument("src")
+    i_crop.add_argument("--box", required=True, metavar="X,Y,W,H")
+    i_crop.add_argument("--out", required=True)
+    i_res = isub.add_parser("resize", help="resize to a width (never enlarges unless --allow-upscale)")
+    i_res.add_argument("src")
+    i_res.add_argument("--width", type=int, required=True)
+    i_res.add_argument("--out", required=True)
+    i_res.add_argument("--allow-upscale", action="store_true")
+    i_cut = isub.add_parser("cutout", help="make a plain background transparent")
+    i_cut.add_argument("src")
+    i_cut.add_argument("--out", required=True, help=".png or .webp")
+    i_cut.add_argument("--tolerance", type=int, default=12, help="how far from the background colour still counts (0-100)")
+    i_exp = isub.add_parser("export", help="write web sizes with metadata stripped, print a srcset")
+    i_exp.add_argument("src")
+    i_exp.add_argument("--widths", required=True, help="comma-separated, e.g. 560,1120")
+    i_exp.add_argument("--out-dir", required=True)
+    i_exp.add_argument("--name", required=True)
+    i_exp.add_argument("--format", default="webp", choices=["webp", "png", "jpeg"])
+    i_strip = isub.add_parser("strip", help="save a copy without metadata")
+    i_strip.add_argument("src")
+    i_strip.add_argument("--out", required=True)
+    img.set_defaults(func=cmd_image)
 
     con = sub.add_parser("contrast", help="WCAG contrast ratios for colour pairs (used by agents)")
     con.add_argument("colours", nargs="+", metavar="COLOUR", help="foreground background [foreground background ...]")

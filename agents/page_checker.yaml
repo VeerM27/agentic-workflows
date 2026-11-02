@@ -5,7 +5,7 @@ role: reviewer
 model: fast
 effort: high
 tools: [list_files, read_file, render_page, check_contrast]
-skills: [svg-scroll-animation]
+skills: [svg-scroll-animation, accessibility-qa-checklist]
 
 inputs:
   plan:

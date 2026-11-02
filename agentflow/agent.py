@@ -74,6 +74,7 @@ class Usage:
     cache_creation_input_tokens: int = 0
     cache_read_input_tokens: int = 0
     requests: int = 0
+    cost_usd: float = 0.0  # reported by Claude Code (API list prices); the API backend reports none
 
     def add(self, usage: Any) -> None:
         if usage is None:
@@ -81,6 +82,7 @@ class Usage:
         self.requests += 1
         for name in ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"):
             setattr(self, name, getattr(self, name) + (getattr(usage, name, 0) or 0))
+        self.cost_usd = round(self.cost_usd + float(getattr(usage, "cost_usd", 0) or 0), 6)
 
     def merge(self, other: "Usage") -> None:
         for name in self.__dataclass_fields__:

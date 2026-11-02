@@ -5,8 +5,8 @@ role: producer
 model: default
 effort: high
 max_turns: 60
-tools: [list_files, read_file, write_file, edit_file, delete_file, render_page, check_contrast]
-skills: [svg-scroll-animation, frontend-design]
+tools: [list_files, read_file, write_file, edit_file, delete_file, render_page, check_contrast, prepare_image]
+skills: [svg-scroll-animation, web-security-checklist]
 
 inputs:
   plan:
@@ -22,7 +22,16 @@ system_prompt: |
   You are a senior creative developer. Follow the `## Coder` section of `docs/plan.md`, implementing
   the designs in `design/` faithfully, and build the page in `site/`:
   - `site/index.html` (entry point), `site/styles.css`, `site/scroll.js` (fallback only), `site/assets/`
-    (optimised copies of the photos and SVGs; never reference files outside `site/`).
+    (never reference files outside `site/`).
+
+  Prepare every photo with the image helper (prepare_image tool or `agentflow image ...`): crop each view you
+  use, cut out plain backgrounds to transparency where the design needs it, then `export` 1× and 2× WebP
+  sizes into `site/assets/` and use the printed `srcset` with sensible `sizes`. Never enlarge a photo; if the
+  source is too small for crisp 2× output, use what it allows and say so in your notes. Exported files have
+  their metadata stripped; ship only exported files, never the original uploads.
+
+  Follow the web-security-checklist skill as you build (no inline handlers or innerHTML, self-hosted assets,
+  a CSP-compatible structure), so the security review has nothing structural to send back.
   - `site/README.md`: how to view it (`agentflow serve <run>` or any static server), how the scroll
     animation works, and which values to tweak.
 

@@ -27,7 +27,8 @@ description: Techniques and standards for building performant, accessible SVG an
 - **Staggered reveals:** one timeline, different `animation-range` per element, or `--i` index
   custom properties multiplied into the range/offset.
 - **Parallax layers:** translate groups on the Y axis at different rates; keep to `transform`.
-- **Morph-like transitions:** cross-fade or clip between two shapes (`clip-path`, masks, opacity).
+- **Morph-like transitions:** cross-fade between two shapes, or reveal with a mask whose own transform or
+  opacity is animated (not the mask's shape).
   True path morphing needs identical point counts; avoid it unless you control both paths.
 - **Pinned sequences:** a tall container (e.g. `height: 300vh`) with a `position: sticky` stage;
   drive the stage from `view-timeline` on the container (`view-timeline-name: --story;` then
@@ -36,8 +37,9 @@ description: Techniques and standards for building performant, accessible SVG an
 
 ## Standards
 
-- Animate only `transform`, `opacity`, `stroke-dashoffset`, `fill`/`stroke` colour, `clip-path`.
-  Never animate layout properties (width/height/top/left/margins) on scroll.
+- Animate only `transform`, `opacity`, `stroke-dashoffset` and `fill`/`stroke` colour. Static `clip-path`
+  shapes (cutting a layer out once) are fine; don't animate `clip-path` itself. Never animate layout
+  properties (width/height/top/left/margins) on scroll. Where the operator's house style is stricter, it wins.
 - Use `viewBox` and no fixed width/height so the SVG scales; inline the SVG when it is animated.
 - Keep SVGs lean: merge paths where possible, round coordinates to 1–2 decimals, remove editor metadata.
 - Decorative graphics: `aria-hidden="true"`. Meaningful graphics: `role="img"` with `<title>`
@@ -48,7 +50,9 @@ description: Techniques and standards for building performant, accessible SVG an
 - No dependencies by default. If the brief allows a library, GSAP + ScrollTrigger is the usual
   choice for complex choreography; still provide the reduced-motion path.
 
-## File layout for a deliverable
+## File layout (fallback)
+
+Use the file names and folders your plan and instructions give you. Only when they say nothing, use:
 
 ```
 animations/<name>/

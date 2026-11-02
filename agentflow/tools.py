@@ -12,6 +12,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -121,6 +122,29 @@ WORKSPACE_TOOLS["check_contrast"] = {
             }
         },
         ["pairs"],
+    ),
+}
+
+WORKSPACE_TOOLS["prepare_image"] = {
+    "description": (
+        "Prepare images in the workspace. operation: 'info' (size, transparency, metadata), 'crop' (box), "
+        "'resize' (width; never enlarges), 'cutout' (make a plain background transparent), 'export' "
+        "(web sizes at the given widths, metadata stripped, returns a srcset), 'strip' (remove metadata)."
+    ),
+    "input_schema": _schema(
+        {
+            "operation": {"type": "string", "enum": ["info", "crop", "resize", "cutout", "export", "strip"]},
+            "path": {"type": "string", "description": "Source image, relative to the workspace root."},
+            "out": {"type": "string", "description": "Output file (crop, resize, cutout, strip)."},
+            "box": {"type": "array", "items": {"type": "integer"}, "description": "crop: [x, y, width, height]."},
+            "width": {"type": "integer", "description": "resize: target width."},
+            "widths": {"type": "array", "items": {"type": "integer"}, "description": "export: widths, e.g. [560, 1120]."},
+            "out_dir": {"type": "string", "description": "export: output folder."},
+            "name": {"type": "string", "description": "export: base file name."},
+            "format": {"type": "string", "enum": ["webp", "png", "jpeg"]},
+            "tolerance": {"type": "integer", "description": "cutout: 0-100, default 12."},
+        },
+        ["operation", "path"],
     ),
 }
 
@@ -378,6 +402,44 @@ class ToolExecutor:
             )
             lines.append(f"{label}: {ratio:.2f}:1 — {verdict}")
         return "\n".join(lines)
+
+    def _tool_prepare_image(self, operation: str, path: str, out: str | None = None, box: list | None = None,
+                            width: int | None = None, widths: list | None = None, out_dir: str | None = None,
+                            name: str | None = None, format: str = "webp", tolerance: int = 12) -> str:
+        from . import images
+
+        root = self.workspace.root
+
+        def need(value, label):
+            if value in (None, "", []):
+                raise ToolError(f"'{operation}' needs '{label}'")
+            return value
+
+        try:
+            if operation == "info":
+                return images.info(path, root).describe()
+            if operation == "crop":
+                b = need(box, "box")
+                if len(b) != 4:
+                    raise ToolError("box must be [x, y, width, height]")
+                result = images.crop(path, need(out, "out"), tuple(b), root)
+            elif operation == "resize":
+                result = images.resize(path, need(out, "out"), need(width, "width"), root)
+            elif operation == "cutout":
+                result = images.cutout(path, need(out, "out"), root, tolerance=tolerance)
+            elif operation == "export":
+                result = images.export(path, need(out_dir, "out_dir"), need(name, "name"), need(widths, "widths"),
+                                       root, fmt=format)
+            elif operation == "strip":
+                result = images.strip(path, need(out, "out"), root)
+            else:
+                raise ToolError(f"unknown operation '{operation}'")
+        except images.ImageError as exc:
+            raise ToolError(str(exc)) from exc
+        for written in re.findall(r"(\S+\.(?:webp|png|jpe?g))", result):
+            if self.workspace.exists(written):
+                self.files_written.add(written)
+        return result
 
     def _tool_read_skill_file(self, skill: str, path: str) -> str:
         if skill not in self.skills:

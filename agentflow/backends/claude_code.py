@@ -39,14 +39,23 @@ _LIMIT_PATTERN = re.compile(r"usage limit|limit reached|hit your limit|rate limi
 HELPER_COMMANDS = """\
 # Helper commands
 
-You can run exactly these two shell commands (nothing else is allowed):
+You can run only these agentflow commands in the shell (nothing else is allowed):
 
 - `agentflow screenshot <file.html> --out .shots/<name>.png [--width 1280] [--scroll-y <px>] [--full-page]`
   renders a page in a headless browser; then open the PNG with the Read tool to see it. Use several
   `--scroll-y` values to inspect scroll-driven animations frame by frame, and `--width 375` for mobile.
 - `agentflow contrast <foreground> <background> [<fg> <bg> ...]` prints exact WCAG contrast ratios.
 
+- `agentflow image info <file>...` shows an image's exact size, transparency and metadata.
+{image_tools}
 If a helper reports it is unavailable, continue without it and say so in your hand-off.
+"""
+
+IMAGE_TOOLS_FOR_PRODUCERS = """\
+- `agentflow image crop <src> --box X,Y,W,H --out <file>`, `agentflow image resize <src> --width N --out <file>`
+  (never enlarges), `agentflow image cutout <src> --out <file.png|webp>` (plain background to transparent),
+  `agentflow image export <src> --widths 560,1120 --out-dir site/assets --name <name>` (web sizes, metadata
+  stripped, prints a srcset), `agentflow image strip <src> --out <file>`.
 """
 
 
@@ -102,7 +111,7 @@ class ClaudeCodeRunner:
         self.system = (
             system_prompt_for(spec, house_style, self.skills, skill_reader="open them with the Read tool under `{root}`")
             + "\n"
-            + HELPER_COMMANDS
+            + HELPER_COMMANDS.format(image_tools=IMAGE_TOOLS_FOR_PRODUCERS if spec.role != "reviewer" else "")
             + "\n# Finishing\n\nWhen your work is complete, end with your hand-off as the structured result "
             + f"(the `{self.terminal}` fields), listing file paths relative to the workspace root (e.g. `site/index.html`). "
             + "It is how the next agent and the human see what you did.\n"
@@ -187,6 +196,7 @@ class ClaudeCodeRunner:
         writer = self.spec.role != "reviewer"
         file_tools = ["Read", "Glob", "Grep"] + (["Write", "Edit"] if writer else [])
         allowed = file_tools + ["Bash(agentflow screenshot *)", "Bash(agentflow contrast *)"]
+        allowed.append("Bash(agentflow image *)" if writer else "Bash(agentflow image info *)")
         cmd = [
             claude_binary(), "-p", prompt,
             "--output-format", "json",
@@ -227,7 +237,7 @@ class ClaudeCodeRunner:
         output = _parse_output(proc.stdout)
         text = " ".join(str(x) for x in (output.get("result", ""), proc.stderr, output.get("subtype", "")))
         self.history.append({"role": "assistant", "content": output.get("result", ""), "structured": output.get("structured_output")})
-        self.usage.add(_UsageView(output.get("usage") or {}))
+        self.usage.add(_UsageView(output.get("usage") or {}, output.get("total_cost_usd")))
 
         if output.get("is_error") or proc.returncode != 0 or not output:
             if _LIMIT_PATTERN.search(text):
@@ -237,9 +247,13 @@ class ClaudeCodeRunner:
 
 
 class _UsageView:
-    def __init__(self, data: dict):
+    def __init__(self, data: dict, cost_usd: Any = None):
         for key in ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"):
             setattr(self, key, int(data.get(key) or 0))
+        try:
+            self.cost_usd = float(cost_usd or 0)
+        except (TypeError, ValueError):
+            self.cost_usd = 0.0
 
 
 def _parse_output(stdout: str) -> dict:

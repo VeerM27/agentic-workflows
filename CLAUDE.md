@@ -11,6 +11,7 @@ personal configuration is everything else (agents, workflows, profiles, skills, 
 - `agentflow/tools.py` — tool schemas + `ToolExecutor._tool_<name>` implementations.
 - `agentflow/skills.py` — skills manifest/lockfile/vendoring; `agentflow/project.py` — agentflow.yaml.
 - `agentflow/checkpoints.py` — approvers (terminal/pause/auto/scripted) and the gallery page.
+- `agentflow/images.py` — image preparation (`agentflow image …` / `prepare_image` tool); paths confined to the workspace.
 
 ## Conventions
 - Agents don't hard-code models; use aliases from `agentflow.yaml` (`default`, `fast`) or omit `model`.

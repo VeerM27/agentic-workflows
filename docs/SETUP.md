@@ -155,6 +155,20 @@ To change who does what, edit the agent files (`agents/brief_reviewer.yaml`, `pl
 `final_reviewer.yaml`, `skill_auditor.yaml`). To change which skills each agent loads, edit their
 `skills:` list.
 
+### Photos that give the best results
+
+Agents use your photos directly: they crop, cut out and export them with `agentflow image`, and never
+redraw or enlarge them. So the photos set the ceiling on sharpness:
+- **Resolution:** about 2–3× the size the product will be shown. A shoe shown 560px wide wants source
+  views 1,100–1,700px wide. The brief reviewer reports each photo's exact size and warns when it's too small.
+- **Background:** plain or white backgrounds cut out cleanly (`agentflow image cutout`). Transparent
+  PNG/WebP cut-outs are even better.
+- **For "built from its materials" stories:** separate shots of the parts (sole, upper, laces, materials)
+  or an exploded-view shoot give a far more convincing build than slicing one picture.
+- **Metadata:** exported images always have EXIF/GPS stripped; originals are never shipped.
+
+You can check a photo yourself before a run: `agentflow image info photo.jpg`.
+
 ## 4. Staying in the loop
 
 `approvals` in `agentflow.yaml` decides how checkpoints reach you:

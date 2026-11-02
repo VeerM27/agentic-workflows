@@ -537,6 +537,11 @@ class Orchestrator:
             f"Tokens so far: {total.input_tokens:,} in (+{total.cache_read_input_tokens:,} cache reads, "
             f"{total.cache_creation_input_tokens:,} cache writes), {total.output_tokens:,} out over {total.requests} requests"
         )
+        if total.cost_usd:
+            usage_line += (
+                f"\n≈ ${total.cost_usd:,.2f} at API list prices (Claude Code's estimate; on a subscription "
+                "this counts toward your plan's usage limits instead)"
+            )
         if status in ("paused", "stopped"):
             pending = next((r for r in self.records.values() if r.status in ("awaiting_approval", "interrupted")), None)
             if self.pause_reason:
