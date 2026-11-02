@@ -129,6 +129,18 @@ def test_invalid_handoff_is_corrected_in_the_same_session(tmp_path, fake_claude)
     assert "not in the workspace" in calls[1]["prompt"] and calls[1]["session"] == calls[0]["session"]
 
 
+def test_absolute_paths_in_handoff_are_made_relative(tmp_path, fake_claude):
+    agents = load_agents(ROOT / "agents")
+    ws = Workspace(tmp_path / "ws")
+    fake_claude.script({"landing_coder": [
+        {"write": {"site/index.html": "x"}, "handoff": {"summary": "s", "files": [str(ws.root / "site/index.html")],
+                                                        "notes_for_next_agent": "-"}},
+    ]})
+    result = ClaudeCodeRunner(agents["landing_coder"], None, ws).start([{"type": "text", "text": "go"}])
+    assert result.files == ["site/index.html"]
+    assert len(fake_claude.calls()) == 1  # accepted first time, no correction round
+
+
 def test_usage_limit_is_recognised(tmp_path, fake_claude):
     agents = load_agents(ROOT / "agents")
     fake_claude.script({"landing_coder": [{"error": "Claude AI usage limit reached. Your limit resets at 5pm."}]})

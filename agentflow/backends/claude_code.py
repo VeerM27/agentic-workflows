@@ -98,7 +98,8 @@ class ClaudeCodeRunner:
             + "\n"
             + HELPER_COMMANDS
             + "\n# Finishing\n\nWhen your work is complete, end with your hand-off as the structured result "
-            + f"(the `{self.terminal}` fields). It is how the next agent and the human see what you did.\n"
+            + f"(the `{self.terminal}` fields), listing file paths relative to the workspace root (e.g. `site/index.html`). "
+            + "It is how the next agent and the human see what you did.\n"
         )
         self.session_id: str | None = None
         self.history: list[dict] = []  # prompts sent and results received, for transcripts
@@ -159,11 +160,22 @@ class ClaudeCodeRunner:
             data = _json_from_text(output.get("result", ""))
         if not isinstance(data, dict):
             return None, f"no structured hand-off was returned; return the `{self.terminal}` fields as JSON"
+        if isinstance(data.get("files"), list):
+            data = {**data, "files": [self._relative(f) for f in data["files"]]}
         error = validate_input(self.schema, data, "hand-off")
         if error:
             return None, error
         problem = check_handoff(self.terminal, data, self.workspace)
         return (data, None) if problem is None else (None, problem)
+
+    def _relative(self, path: Any) -> Any:
+        """Claude Code often reports absolute paths; hand-offs use workspace-relative ones."""
+        if not isinstance(path, str) or not os.path.isabs(path):
+            return path
+        try:
+            return Path(path).resolve().relative_to(self.workspace.root).as_posix()
+        except ValueError:
+            return path  # outside the workspace: left as-is so the check reports it
 
     def command(self, prompt: str, *, new_session: bool) -> list[str]:
         writer = self.spec.role != "reviewer"
