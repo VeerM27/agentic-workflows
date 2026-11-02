@@ -4,6 +4,25 @@ This guide covers making the pipeline yours (your preferences, industries, skill
 specialists), staying in the loop, and keeping the setup reliable as models, skills and your own
 practice change.
 
+## 0. Pro plan (no API key)
+
+`agentflow.yaml` has `backend: claude-code`: every agent runs through Claude Code on your
+subscription. Install Claude Code, run `claude auth login` with your Pro/Max account, then run
+`agentflow doctor`, which confirms you're logged in.
+
+- **Shared limits:** runs share your plan's 5-hour and weekly usage limits with claude.ai. When a
+  limit is hit, the run pauses with everything saved; `agentflow resume <run>` continues in the same
+  agent session after the reset (`/usage` in Claude Code shows where you are).
+- **Stretching your plan:** keep `skills.audit: on_change` (the audit only runs when agents, skills
+  or upstream versions changed). Use `fast` (Sonnet) for reviewers, as configured. Use one variant
+  at a time. Approve steps promptly rather than re-running them.
+- **API keys:** if `ANTHROPIC_API_KEY` is set in your shell, agentflow removes it for Claude Code
+  sessions so the subscription is used. `doctor` warns you about it.
+- **Model access:** if your plan doesn't include a model, change the `default` alias in `agentflow.yaml`
+  (e.g. to `claude-sonnet-5-5`).
+- **Runs folder:** runs are written to `~/agentflow-runs` (outside this repo), so the repo's own
+  `CLAUDE.md` doesn't leak into agent sessions.
+
 ## 1. One-time setup
 
 ```bash
@@ -20,10 +39,6 @@ pip install -e '.[render,dev]'
 
 ```bash
 playwright install chromium
-```
-
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 If you already have Chrome or Chromium installed, skip `playwright install` and set
@@ -119,7 +134,28 @@ Examples worth adding for your kind of work: `copywriter` (industry-specific cop
 `brand_designer` (logo image in, tokens out), `accessibility_auditor` (a second reviewer on build),
 `seo_reviewer`, `illustration_designer` (SVG illustration sets), `backend_engineer`.
 
-## 3. Staying in the loop
+## 3. The scroll-landing workflow, step by step
+
+1. **Skill audit (before anything runs).** agentflow checks each pinned GitHub skill for upstream
+   commits (without changing anything). The `skill_auditor` agent reads every agent's instructions
+   and skills and reports updates worth taking, redundant or conflicting skills, and gaps. Then you
+   choose: `c` continue, `u [names]` update and continue, or `s` stop. Pause-mode equivalents:
+   `agentflow resume <run> --approve` or `--update-skills frontend-design`. Commit `skills/`
+   afterwards if you keep an update.
+2. **Brief review.** Reports fixes, suggestions and questions about your idea and photos, and writes
+   the refined brief. Correct it with feedback if it assumed wrong.
+3. **Plan.** `docs/plan.md` with the scroll storyboard and a numbered task list plus acceptance
+   criteria for each later agent.
+4. **Design**, then 5. **Build.**
+6. **Check**, 7. **Security**, 8. **Final review.** These report only (`reports/<step>.md`). At each
+   checkpoint: approve, `r fix issues 1 and 3` / `r all` (sent to the coder, then re-checked), or stop.
+
+To change who does what, edit the agent files (`agents/brief_reviewer.yaml`, `planner.yaml`,
+`landing_designer.yaml`, `landing_coder.yaml`, `page_checker.yaml`, `security_reviewer.yaml`,
+`final_reviewer.yaml`, `skill_auditor.yaml`). To change which skills each agent loads, edit their
+`skills:` list.
+
+## 4. Staying in the loop
 
 `approvals` in `agentflow.yaml` decides how checkpoints reach you:
 
@@ -145,7 +181,7 @@ Everything is on disk: `runs/<run>/checkpoints/<step>.html` (gallery), `run.json
 usage, models and skill commits used), `events.jsonl` (every tool call and decision),
 `transcripts/` (every agent conversation).
 
-## 4. Future-proofing
+## 5. Future-proofing
 
 **Models change → edit one line.** Agents don't name models. They use the `default` alias (or another
 alias such as `fast`) defined in `agentflow.yaml`. When a new model ships, update `models.default`,
@@ -190,7 +226,7 @@ the previous runs. That's the most reliable way to know a change made things bet
 house style and local skills are the valuable part. Their git history shows what changed when
 output quality changed.
 
-## 5. Extending the engine
+## 6. Extending the engine
 
 - **Approvals from elsewhere** (Slack buttons, a web page): `pause` mode plus `agentflow resume
   --approve/--feedback` is the integration point. Anything that can run a command can answer a checkpoint.

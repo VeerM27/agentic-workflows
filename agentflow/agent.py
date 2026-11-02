@@ -100,7 +100,10 @@ class AgentResult:
     usage: Usage = field(default_factory=Usage)
 
 
-def system_prompt_for(spec: AgentSpec, house_style: str = "", skills: list | None = None) -> str:
+def system_prompt_for(
+    spec: AgentSpec, house_style: str = "", skills: list | None = None, skill_reader: str | None = None
+) -> str:
+    """Assemble an agent's instructions. `skill_reader` overrides how skill files are read (per backend)."""
     rules = REVIEWER_RULES if spec.role == "reviewer" else PRODUCER_RULES
     parts = [PIPELINE_PREAMBLE.format(name=spec.name), rules, f"# Your role\n\n{spec.system_prompt}\n"]
     if house_style:
@@ -109,7 +112,7 @@ def system_prompt_for(spec: AgentSpec, house_style: str = "", skills: list | Non
             f"Follow them unless your inputs say otherwise.\n\n{house_style}\n"
         )
     if skills:
-        parts.append(SKILLS_PREAMBLE + "\n" + "\n\n".join(s.prompt_section() for s in skills) + "\n")
+        parts.append(SKILLS_PREAMBLE + "\n" + "\n\n".join(s.prompt_section(skill_reader) for s in skills) + "\n")
     return "\n".join(parts)
 
 
@@ -330,26 +333,32 @@ class AgentRunner:
         return results, finished
 
     def _check_handoff(self, args: dict) -> str | None:
-        if self.terminal == COMPLETE_TASK:
-            missing = [f for f in args["files"] if not self.workspace.exists(f)]
-            if missing:
-                return f"These files are not in the workspace: {missing}. Write them first or remove them from `files`."
-        else:
-            if args["verdict"] == "revise" and not args["issues"]:
-                return "A 'revise' verdict needs at least one issue describing what to fix."
-        return None
+        return check_handoff(self.terminal, args, self.workspace)
 
     def _result(self, data: dict) -> AgentResult:
-        result = AgentResult(agent=self.spec.name, role=self.spec.role, turns=self.turns, usage=self.usage)
-        if self.terminal == COMPLETE_TASK:
-            result.summary = data["summary"]
-            result.files = list(dict.fromkeys(data["files"]))
-            result.notes = data["notes_for_next_agent"]
-        else:
-            result.summary = data["summary"]
-            result.verdict = data["verdict"]
-            result.issues = data["issues"]
-        return result
+        return result_from_handoff(self.spec, self.terminal, data, self.turns, self.usage)
+
+
+def check_handoff(terminal: str, args: dict, workspace: Workspace) -> str | None:
+    """Problems with a hand-off that the agent must fix before it counts (shared by all backends)."""
+    if terminal == COMPLETE_TASK:
+        missing = [f for f in args["files"] if not workspace.exists(f)]
+        if missing:
+            return f"These files are not in the workspace: {missing}. Write them first or remove them from `files`."
+    elif args["verdict"] == "revise" and not args["issues"]:
+        return "A 'revise' verdict needs at least one issue describing what to fix."
+    return None
+
+
+def result_from_handoff(spec: AgentSpec, terminal: str, data: dict, turns: int, usage: Usage) -> AgentResult:
+    result = AgentResult(agent=spec.name, role=spec.role, turns=turns, usage=usage, summary=data["summary"])
+    if terminal == COMPLETE_TASK:
+        result.files = list(dict.fromkeys(data["files"]))
+        result.notes = data["notes_for_next_agent"]
+    else:
+        result.verdict = data["verdict"]
+        result.issues = data["issues"]
+    return result
 
 
 def _short_args(args: dict) -> dict:

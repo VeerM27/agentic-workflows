@@ -1,0 +1,75 @@
+version: 1
+name: scroll-landing
+description: |
+  Idea + product photos -> brief review -> plan -> design -> build -> check -> security -> final review.
+  Skills are audited before the run starts. You approve every step; the three checks only report,
+  and at each one you decide what goes back to the coder.
+
+preflight: [skill_audit]
+checkpoints: all
+
+inputs:
+  idea:
+    type: text
+    required: true
+    description: Your idea, e.g. "A landing page for our trail shoe where the shoe is built from its materials as you scroll"
+  photos:
+    type: images
+    description: Photos of the product (comma-separated paths or URLs)
+  industry:
+    type: profile
+    library: profiles/industries
+    description: Industry profile name (e.g. ecommerce-retail) or free text
+  brand:
+    type: text
+    description: Brand guidance (colours, fonts, tone, logo)
+
+steps:
+  - id: brief
+    agent: brief_reviewer
+    inputs:
+      idea: ${inputs.idea}
+      photos: ${inputs.photos}
+      industry: ${inputs.industry}
+      brand: ${inputs.brand}
+
+  - id: plan
+    agent: planner
+    inputs:
+      brief: ${steps.brief.handoff}
+      photos: ${inputs.photos}
+
+  - id: design
+    agent: landing_designer
+    inputs:
+      plan: ${steps.plan.handoff}
+      photos: ${inputs.photos}
+      brand: ${inputs.brand}
+
+  - id: build
+    agent: landing_coder
+    inputs:
+      plan: ${steps.plan.handoff}
+      design: ${steps.design.handoff}
+
+  - id: check
+    agent: page_checker
+    fixes: build
+    inputs:
+      plan: ${steps.plan.handoff}
+      build: ${steps.build.handoff}
+
+  - id: security
+    agent: security_reviewer
+    fixes: build
+    inputs:
+      plan: ${steps.plan.handoff}
+      build: ${steps.build.handoff}
+
+  - id: final
+    agent: final_reviewer
+    fixes: build
+    inputs:
+      brief: ${steps.brief.handoff}
+      plan: ${steps.plan.handoff}
+      build: ${steps.build.handoff}

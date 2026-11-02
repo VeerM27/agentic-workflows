@@ -1,8 +1,15 @@
 # agentflow project settings — the one file to personalise and future-proof your setup.
 version: 1
 
+# How agents run:
+#   claude-code  through Claude Code (`claude -p`) on your Claude subscription (Pro/Max). No API key.
+#                Install Claude Code and log in once with `claude auth login`; check with `agentflow doctor`.
+#   api          through the Claude API with an API key (billed separately, no subscription limits).
+backend: claude-code
+
 # Model aliases. Agents refer to these names (or say nothing and get `default`), so when a new
 # model ships you change ONE line here instead of every agent file.
+# `default` is used by the makers (designer, coder), `fast` by reviewers, planner and auditors.
 models:
   default: claude-opus-5-5
   fast: claude-sonnet-5-5
@@ -18,6 +25,7 @@ house_style: profiles/house-style.md
 # Claude Code skills (SKILL.md folders) pinned by commit. See skills/skills.yaml.
 skills:
   manifest: skills/skills.yaml
+  audit: on_change      # skill audit before runs: on_change (skip if nothing changed) | always | off
 
 # How you are kept in the loop.
 approvals:
@@ -33,4 +41,5 @@ approvals:
 notify:
   command:
 
-runs_dir: runs
+# Kept outside this repo so the repo's own CLAUDE.md (developer notes) isn't picked up by agents.
+runs_dir: ~/agentflow-runs

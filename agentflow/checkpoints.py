@@ -51,16 +51,29 @@ class CheckpointView:
     lanes: list[LaneView]
     gallery: Path | None
     run_dir: Path
+    fix_target: str | None = None  # report-only reviewer steps: who applies the fixes you ask for
+    report: Path | None = None
 
     @property
     def has_variants(self) -> bool:
         return len(self.lanes) > 1
 
 
+@dataclass
+class PreflightView:
+    """The skill audit shown before a run starts."""
+
+    report: str
+    report_path: Path
+    updatable: list[str]  # skills with upstream updates
+
+
 class Approver(Protocol):
     def confirm_start(self, plan: str) -> bool: ...
 
     def decide(self, view: CheckpointView) -> Decision: ...
+
+    def decide_preflight(self, view: PreflightView) -> Decision: ...
 
 
 def default_lane(view: CheckpointView) -> str | None:
@@ -76,6 +89,9 @@ class AutoApprover:
     def confirm_start(self, plan: str) -> bool:
         return True
 
+    def decide_preflight(self, view: PreflightView) -> Decision:
+        return Decision("approve")
+
     def decide(self, view: CheckpointView) -> Decision:
         lane = default_lane(view)
         return Decision("approve", lane) if lane else Decision("stop")
@@ -84,6 +100,9 @@ class AutoApprover:
 class PauseApprover:
     def confirm_start(self, plan: str) -> bool:
         return True
+
+    def decide_preflight(self, view: PreflightView) -> Decision:
+        return Decision("pause")
 
     def decide(self, view: CheckpointView) -> Decision:
         return Decision("pause")
@@ -104,6 +123,11 @@ class ScriptedApprover:
             return self.decisions.pop(0)
         return self.then.decide(view)
 
+    def decide_preflight(self, view: PreflightView) -> Decision:
+        if self.decisions:
+            return self.decisions.pop(0)
+        return self.then.decide_preflight(view)
+
 
 class TerminalApprover:
     def __init__(self, input_fn: Callable[[str], str] = input, print_fn: Callable[[str], None] = print):
@@ -118,10 +142,17 @@ class TerminalApprover:
     def decide(self, view: CheckpointView) -> Decision:
         self.print(render_view(view))
         keys = [lane.key for lane in view.lanes if lane.status != "failed"]
+        if view.fix_target:
+            revise_help = (
+                f"  r <what to fix>        send fixes to the '{view.fix_target}' agent, then this check runs again\n"
+                f"  r all                  ask the '{view.fix_target}' agent to fix every issue in the report\n"
+            )
+        else:
+            revise_help = "  r [variant] <feedback> request changes (the agent revises, the reviewer re-checks)\n"
         help_text = (
             "  a [variant]            approve" + (" and continue with that variant" if view.has_variants else "") + "\n"
-            "  r [variant] <feedback> request changes (the agent revises, the reviewer re-checks)\n"
-            "  s                      stop here (resume later with `agentflow resume`)"
+            + revise_help
+            + "  s                      stop here (resume later with `agentflow resume`)"
         )
         self.print(help_text)
         while True:
@@ -148,6 +179,31 @@ class TerminalApprover:
             if cmd in ("s", "stop", "q", "quit"):
                 return Decision("stop")
             self.print(help_text)
+
+
+    def decide_preflight(self, view: PreflightView) -> Decision:
+        self.print(view.report)
+        self.print(f"\n(full report: {view.report_path})")
+        hint = f" (available: {', '.join(view.updatable)})" if view.updatable else ""
+        self.print(
+            "  c              continue with the skills as they are\n"
+            f"  u [names]      update skills{hint}, then continue\n"
+            "  s              stop"
+        )
+        while True:
+            raw = self.input("\n> ").strip()
+            cmd, _, rest = raw.partition(" ")
+            cmd = cmd.lower()
+            if cmd in ("c", "continue", "a", "approve"):
+                return Decision("approve")
+            if cmd in ("u", "update"):
+                names = [n.strip() for n in rest.replace(",", " ").split() if n.strip()] or view.updatable
+                if not names:
+                    self.print("No updates are available; use `c` to continue.")
+                    continue
+                return Decision("update", feedback=",".join(names))
+            if cmd in ("s", "stop", "q"):
+                return Decision("stop")
 
 
 def _take_lane(text: str, keys: list[str]) -> tuple[str | None, str]:
@@ -179,8 +235,10 @@ def render_view(view: CheckpointView) -> str:
         if lane.verdicts:
             lines.append(f"  review: {' → '.join(lane.verdicts)}")
         lines.append(f"  workspace: {lane.workspace}")
+    if view.report:
+        lines.append(f"\nReport: {view.report}")
     if view.gallery:
-        lines.append(f"\nOpen to look and compare: {view.gallery}")
+        lines.append(f"Open to look and compare: {view.gallery}")
     return "\n".join(lines)
 
 

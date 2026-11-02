@@ -11,8 +11,10 @@ Runs refuse to start if a vendored skill no longer matches its locked hash.
 
 from __future__ import annotations
 
+import difflib
 import hashlib
 import json
+import re
 import shutil
 import subprocess
 import tempfile
@@ -72,12 +74,15 @@ class Skill:
             raise SkillError(f"{rel} is a binary file; only text files can be read")
         return target.read_text(encoding="utf-8")
 
-    def prompt_section(self) -> str:
+    def prompt_section(self, reader: str | None = None) -> str:
+        """The skill as a system-prompt section. `reader` says how to open its supporting files;
+        `{root}` in it is replaced by the skill's folder."""
         lines = [f"## Skill: {self.name}", f"_{self.description}_", ""]
         others = [f for f in self.files if f not in ("SKILL.md", "LICENSE.txt", "LICENSE")]
         if others:
+            how = (reader or "read them with `read_skill_file`").replace("{root}", str(self.root.resolve()))
             lines.append(
-                "Supporting files (read them with `read_skill_file` when the instructions refer to them): "
+                f"Supporting files ({how} when the instructions refer to them): "
                 + ", ".join(f"`{f}`" for f in others)
             )
             lines.append("")
@@ -197,6 +202,45 @@ class SkillLibrary:
                 problems.append(f"skill '{name}' files differ from the locked hash (edited or corrupted)")
         return problems
 
+    # --- checking for updates -------------------------------------------------------
+
+    def check_updates(self, names: list[str] | None = None, log=lambda *_: None) -> list["SkillUpdate"]:
+        """Which remote skills have a newer commit on their ref than the locked one, and what changed.
+
+        Read-only: nothing in skills/ is modified. Skills pinned to a commit SHA never update.
+        """
+        updates: list[SkillUpdate] = []
+        for name in names or list(self.sources):
+            src = self.sources.get(name)
+            if src is None or src.local or re.fullmatch(r"[0-9a-f]{40}", src.ref):
+                continue
+            locked = self.lock.get(name, {}).get("commit")
+            try:
+                latest = _ls_remote(src.git_url, src.ref)
+            except SkillError as exc:
+                log(f"  ? {name}: could not check for updates ({exc})")
+                continue
+            if latest is None or latest == locked:
+                continue
+            with tempfile.TemporaryDirectory() as tmp:
+                repo_dir = Path(tmp) / "repo"
+                commit = _git_fetch(src.git_url, latest, repo_dir)
+                new_dir = repo_dir / src.path if src.path else repo_dir
+                old_dir = self.vendor_dir / name
+                before, after = _file_hashes(old_dir), _file_hashes(new_dir)
+                changed = sorted(f for f in set(before) | set(after) if before.get(f) != after.get(f))
+                old_md = (old_dir / "SKILL.md").read_text(encoding="utf-8") if (old_dir / "SKILL.md").is_file() else ""
+                new_md = (new_dir / "SKILL.md").read_text(encoding="utf-8") if (new_dir / "SKILL.md").is_file() else ""
+                diff = "".join(
+                    difflib.unified_diff(
+                        old_md.splitlines(keepends=True), new_md.splitlines(keepends=True),
+                        fromfile=f"{name}/SKILL.md (pinned)", tofile=f"{name}/SKILL.md (latest)",
+                    )
+                )
+            if changed:
+                updates.append(SkillUpdate(name, locked, commit, changed, diff))
+        return updates
+
     # --- installing ----------------------------------------------------------------
 
     def sync(self, log=print) -> None:
@@ -256,6 +300,30 @@ class SkillLibrary:
     def _write_lock(self) -> None:
         self.lock = {k: v for k, v in sorted(self.lock.items()) if k in self.sources}
         self.lock_path.write_text(json.dumps(self.lock, indent=2) + "\n", encoding="utf-8")
+
+
+@dataclass
+class SkillUpdate:
+    name: str
+    locked: str | None
+    latest: str
+    changed_files: list[str]
+    skill_md_diff: str
+
+
+def _ls_remote(url: str, ref: str) -> str | None:
+    try:
+        out = subprocess.run(["git", "ls-remote", url, ref], check=True, capture_output=True, text=True, timeout=60)
+    except FileNotFoundError as exc:
+        raise SkillError("git is required") from exc
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        raise SkillError(getattr(exc, "stderr", "") or str(exc)) from exc
+    for line in out.stdout.splitlines():
+        sha, _, name = line.partition("\t")
+        if name in (ref, f"refs/heads/{ref}", f"refs/tags/{ref}", "HEAD"):
+            return sha
+    first = out.stdout.split()
+    return first[0] if first else None
 
 
 def _file_hashes(root: Path) -> dict[str, str]:

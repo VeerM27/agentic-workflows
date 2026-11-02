@@ -23,6 +23,14 @@ skills:
     local: local/svg-scroll-animation
     note: Your own motion techniques and standards. Edit it as your practice evolves.
 
+  brief-review:
+    local: local/brief-review
+    note: Rubric for reviewing a request before work starts. Used by the brief reviewer.
+
+  web-security-checklist:
+    local: local/web-security-checklist
+    note: Front-end security and privacy checklist. Used by the security reviewer.
+
   # Add the skills you use, e.g.:
   # my-team-skill:
   #   repo: your-org/claude-skills

@@ -122,8 +122,11 @@ def stage_inputs(inputs: dict[str, Any], specs: dict[str, InputSpec], workspace:
         spec = specs[name]
         if spec.type not in ("file", "image", "images"):
             continue
-        for ref in as_list(value):
+        for i, ref in enumerate(as_list(value), 1):
             if is_url(ref):
+                rel = _download(ref, name, i, workspace)
+                if rel:
+                    staged[ref] = rel
                 continue
             src = Path(ref)
             rel = f"inputs/{name}/{src.name}"
@@ -134,7 +137,35 @@ def stage_inputs(inputs: dict[str, Any], specs: dict[str, InputSpec], workspace:
     return staged
 
 
-def _image_block(ref: str) -> dict:
+def _download(url: str, name: str, index: int, workspace: Workspace) -> str | None:
+    """Save a URL input into the workspace (best effort), so file-based agents can open it."""
+    import urllib.request
+    from urllib.parse import urlparse
+
+    suffix = Path(urlparse(url).path).suffix.lower()
+    if suffix not in IMAGE_MEDIA_TYPES:
+        suffix = ".png"
+    rel = f"inputs/{name}/url-{index}{suffix}"
+    try:
+        with urllib.request.urlopen(url, timeout=30) as resp:  # noqa: S310 - user-supplied input URL
+            data = resp.read(10 * 1024 * 1024 + 1)
+        if len(data) > 10 * 1024 * 1024:
+            return None
+        workspace.write_bytes(rel, data)
+        return rel
+    except Exception:
+        return None
+
+
+def _image_block(ref: str, staged_path: str | None = None, inline: bool = True) -> dict:
+    if not inline:
+        if staged_path:
+            return {"type": "image", "source": {"type": "workspace", "path": staged_path}}
+        return {"type": "image", "source": {"type": "url", "url": ref}}
+    return _inline_image_block(ref)
+
+
+def _inline_image_block(ref: str) -> dict:
     if is_url(ref):
         return {"type": "image", "source": {"type": "url", "url": ref}}
     path = Path(ref)
@@ -151,6 +182,7 @@ def build_task_content(
     staged: dict[str, str] | None = None,
     instructions: str = "",
     closing: str = "",
+    inline_images: bool = True,
 ) -> list[dict]:
     """Render an agent's arguments as the content of its first user message."""
     staged = staged or {}
@@ -174,7 +206,7 @@ def build_task_content(
                 if ws_path:
                     label += f" (also saved in the workspace at `{ws_path}`)"
                 blocks.append({"type": "text", "text": label})
-                blocks.append(_image_block(ref))
+                blocks.append(_image_block(ref, ws_path, inline_images))
         elif spec.type == "file":
             path = Path(value)
             text = path.read_text(encoding="utf-8")

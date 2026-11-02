@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .agent import AgentResult, AgentRunner, Usage
+from .backends.claude_code import ClaudeCodeRunner, UsageLimitReached
 from .checkpoints import (
     Approver,
     AutoApprover,
@@ -33,6 +34,7 @@ from .checkpoints import (
     Decision,
     LaneView,
     PauseApprover,
+    PreflightView,
     ScriptedApprover,
     TerminalApprover,
     build_gallery,
@@ -40,6 +42,7 @@ from .checkpoints import (
 from .config import (
     REF_PATTERN,
     REVIEW_WORK_ARG,
+    SKILL_AUDITOR_AGENT,
     AgentSpec,
     ConfigError,
     StepSpec,
@@ -103,6 +106,7 @@ class Lane:
     human_feedback: list[str] = field(default_factory=list)
     usage: Usage = field(default_factory=Usage)
     error: str | None = None
+    phase: str = "producer"  # where work was when interrupted: producer | review
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -123,7 +127,7 @@ class Lane:
             status=self.status,
             summary=r.summary if r else "",
             files=list(r.files) if r else [],
-            verdicts=[v.verdict for v in self.reviews if v.verdict],
+            verdicts=[v.verdict for v in self.reviews if v.verdict] or ([r.verdict] if r and r.verdict else []),
             workspace=Path(self.workspace),
             error=self.error,
         )
@@ -133,7 +137,7 @@ class Lane:
 class StepRecord:
     id: str
     agent: str
-    status: str = "pending"  # pending | running | awaiting_approval | done | rejected | failed
+    status: str = "pending"  # pending | running | interrupted | awaiting_approval | done | rejected | failed
     lanes: list[Lane] = field(default_factory=list)
     chosen: str | None = None
     approved_by: str | None = None  # human | auto
@@ -399,7 +403,13 @@ class Orchestrator:
         return TerminalApprover(print_fn=self.print)
 
     @property
+    def backend(self) -> str:
+        return self.project.backend
+
+    @property
     def client(self):
+        if self.backend == "claude-code":
+            return None
         if self._client is None:
             import anthropic
 
@@ -433,6 +443,7 @@ class Orchestrator:
         self.staged = stage_inputs(resolved, self.workflow.inputs, self.workspace)
         self.inputs = resolved
         self.records = {s.id: StepRecord(id=s.id, agent=s.agent) for s in self.workflow.steps}
+        self.preflight = {}
         self.started_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
         self.print(f"Run directory: {self.run_dir}")
         self._event("run_started", workflow=self.workflow.name)
@@ -459,7 +470,9 @@ class Orchestrator:
             raise WorkflowError("this run already finished")
 
         workflow = load_workflow(state["workflow_source"])
-        project = load_project(state["project_source"]) if state.get("project_source") else None
+        project = kwargs.pop("project", None) or (
+            load_project(state["project_source"]) if state.get("project_source") else None
+        )
         if _file_hash(state["workflow_source"]) != state.get("workflow_hash"):
             if [s["id"] for s in state["steps"]] != [s.id for s in workflow.steps]:
                 raise WorkflowError("the workflow's steps changed since this run started; it cannot be resumed")
@@ -474,21 +487,33 @@ class Orchestrator:
         orch.staged = state.get("staged", {})
         orch.started_at = state.get("started_at")
         orch.records = {s["id"]: StepRecord.from_dict(s) for s in state["steps"]}
+        orch.preflight = state.get("preflight", {})
         orch.print(f"Resuming {run_dir}")
         orch._event("run_resumed")
         return orch._execute()
 
     def _execute(self) -> RunResult:
         status = "done"
+        self.pause_reason = ""
         try:
+            if self.workflow.preflight:
+                self._preflight()
             for step in self.workflow.steps:
                 rec = self.records[step.id]
                 if rec.status in ("done", "rejected"):
                     continue
                 if rec.status == "awaiting_approval":
                     self._checkpoint_loop(step, rec)
+                elif rec.status == "interrupted":
+                    self._run_step(step, rec, resume=True)
                 else:
                     self._run_step(step, rec)  # pending, or unfinished after a crash: (re)run
+        except UsageLimitReached as exc:
+            status = "paused"
+            self.pause_reason = (
+                "Your Claude usage limit was reached. Progress is saved; resume after the limit resets "
+                f"(check with /usage in Claude Code).\n   {exc}"
+            )
         except RunPaused:
             status = "paused"
         except RunStopped:
@@ -505,7 +530,7 @@ class Orchestrator:
         self._save_state(status)
         self._event("run_" + status)
 
-        total = Usage()
+        total = Usage(**self.preflight.get("usage", {})) if self.preflight.get("usage") else Usage()
         for rec in self.records.values():
             total.merge(rec.usage)
         usage_line = (
@@ -513,49 +538,223 @@ class Orchestrator:
             f"{total.cache_creation_input_tokens:,} cache writes), {total.output_tokens:,} out over {total.requests} requests"
         )
         if status in ("paused", "stopped"):
-            pending = next((r for r in self.records.values() if r.status == "awaiting_approval"), None)
-            where = f" at step '{pending.id}'" if pending else ""
-            self.print(
-                f"\n⏸  Run {status}{where}. Look at: {self.run_dir / 'checkpoints'}\n"
-                f"   Continue with one of:\n"
-                f"     agentflow resume {self.run_dir} --approve [--choose v2]\n"
-                f"     agentflow resume {self.run_dir} --feedback \"what to change\" [--lane v2]\n"
-                f"     agentflow resume {self.run_dir}          (asks you in the terminal)\n{usage_line}"
-            )
+            pending = next((r for r in self.records.values() if r.status in ("awaiting_approval", "interrupted")), None)
+            if self.pause_reason:
+                self.print(f"\n{self.pause_reason}")
+            self.print(self._resume_help(status, pending) + f"\n{usage_line}")
             self.project.notify("paused", run_dir=self.run_dir, step=pending.id if pending else "")
         else:
             self.print(f"\n✔ Finished. Workspace: {self.workspace.root}\n{usage_line}")
+            if (self.workspace.root / "site" / "index.html").is_file():
+                self.print(f"\n🌐 Ready to view:  agentflow serve {self.run_dir}")
             self.project.notify("finished", run_dir=self.run_dir, workspace=self.workspace.root)
         return RunResult(self.run_dir, self.workspace.root, list(self.records.values()), total, status)
 
+    def _resume_help(self, status: str, pending: StepRecord | None) -> str:
+        cmd = f"agentflow resume {self.run_dir}"
+        if self.preflight.get("status") == "awaiting":
+            updatable = self.preflight.get("updatable") or []
+            lines = [f"\n⏸  Run {status} at the skill audit.", f"   Report: {self.preflight.get('report_path')}",
+                     "   Continue with one of:", f"     {cmd} --approve            (keep skills as they are)"]
+            if updatable:
+                lines.append(f"     {cmd} --update-skills {','.join(updatable)}")
+            lines.append(f"     {cmd}                      (asks you in the terminal)")
+            return "\n".join(lines)
+        if pending is None:
+            return f"\n⏸  Run {status}.\n   Continue with: {cmd}"
+        step = self.workflow.step(pending.id)
+        if pending.status == "interrupted":
+            return f"\n⏸  Run {status} during step '{pending.id}'.\n   Continue where it stopped with: {cmd}"
+        lines = [f"\n⏸  Run {status} at step '{pending.id}' ({pending.agent})."]
+        gallery = self.run_dir / "checkpoints" / f"{pending.id}.html"
+        if gallery.is_file():
+            lines.append(f"   Look at: {gallery}")
+        if step.fixes and self._report_path(step).is_file():
+            lines.append(f"   Report:  {self._report_path(step)}")
+        lines.append("   Continue with one of:")
+        variants = len(pending.lanes) > 1
+        lines.append(f"     {cmd} --approve" + (" --choose v1" if variants else ""))
+        if step.fixes:
+            target = self.workflow.step(step.fixes).agent
+            lines.append(f"     {cmd} --feedback \"fix issues 1 and 3\"   (sent to {target}; then re-checked)")
+            lines.append(f"     {cmd} --feedback all                   (fix everything in the report)")
+        else:
+            lines.append(f"     {cmd} --feedback \"what to change\"" + (" --lane v1" if variants else ""))
+        lines.append(f"     {cmd}            (asks you in the terminal)")
+        return "\n".join(lines)
+
+    # --- preflight: skill audit --------------------------------------------------------
+
+    def _audit_agents(self) -> list[AgentSpec]:
+        names = [s.agent for s in self.workflow.steps] + [s.review.agent for s in self.workflow.steps if s.review]
+        return [self.agents[n] for n in dict.fromkeys(names) if n in self.agents]
+
+    def _audit_fingerprint(self) -> str:
+        digest = hashlib.sha256()
+        for agent in self._audit_agents():
+            if agent.source and Path(agent.source).is_file():
+                digest.update(Path(agent.source).read_bytes())
+        if self.skills:
+            for path in (self.skills.manifest_path, self.skills.lock_path):
+                if path.is_file():
+                    digest.update(path.read_bytes())
+            from .skills import tree_hash
+
+            for name in sorted(self._skills_used()):
+                src = self.skills.sources.get(name)
+                if src is not None and src.local and src.local.is_dir():
+                    digest.update(tree_hash(src.local).encode())
+        digest.update(self.project.house_style.encode())
+        return digest.hexdigest()
+
+    def _audit_cache_path(self) -> Path:
+        return self.project.root / ".agentflow" / "skill-audit.json"
+
+    def _save_audit_cache(self) -> None:
+        path = self._audit_cache_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"fingerprint": self._audit_fingerprint(),
+                                    "audited_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}, indent=2))
+
+    def _preflight(self) -> None:
+        pf = self.preflight
+        if pf.get("status") == "done" or "skill_audit" not in self.workflow.preflight:
+            return
+        if pf.get("status") != "awaiting":
+            audit = self._run_skill_audit()
+            if audit is None:
+                pf["status"] = "done"
+                self._save_state("running")
+                return
+            pf.update(status="awaiting", **audit)
+            self._save_state("awaiting_approval")
+
+        view = PreflightView(report=pf["report"], report_path=Path(pf["report_path"]), updatable=pf.get("updatable", []))
+        self.project.notify("checkpoint", run_dir=self.run_dir, step="skill-audit", summary=pf["report"][:300])
+        decision = self.approver.decide_preflight(view)
+        self._event("preflight_decision", action=decision.action, skills=decision.feedback)
+        if decision.action == "pause":
+            raise RunPaused("preflight")
+        if decision.action == "stop":
+            raise RunStopped("preflight")
+        if decision.action == "update":
+            names = [n for n in decision.feedback.split(",") if n]
+            unknown = [n for n in names if n not in (self.skills.sources if self.skills else {})]
+            if unknown:
+                raise WorkflowError(f"unknown skills {unknown}")
+            self.print(f"  ↓ updating skills: {', '.join(names)}")
+            self.skills.update(names, log=self.print)
+            problems = self.skills.verify(sorted(self._skills_used()))
+            if problems:
+                raise WorkflowError("skills are not usable after the update: " + "; ".join(problems))
+            pf["updated"] = names
+            self.print("  Updated. Commit skills/ (vendor + lock) when you're happy with the results.")
+        self._save_audit_cache()
+        pf["status"] = "done"
+        self._save_state("running")
+
+    def _run_skill_audit(self) -> dict | None:
+        mode = self.project.skill_audit
+        if mode == "off" or self.skills is None:
+            return None
+        self.print("\n▶ Preflight — skill audit")
+        used = sorted(self._skills_used())
+        updates = self.skills.check_updates(used, log=self.print)
+        cache = self._audit_cache_path()
+        cached = json.loads(cache.read_text()) if cache.is_file() else {}
+        if mode == "on_change" and not updates and cached.get("fingerprint") == self._audit_fingerprint():
+            self.print("  ✓ no skill updates upstream, and agents/skills unchanged since the last audit — skipping")
+            return None
+
+        pack = self.run_dir / "preflight" / "workspace"
+        audit_ws = Workspace(pack)
+        agents = self._audit_agents()
+        index = ["# Skill audit pack", "", "## Agents in this workflow", ""]
+        for agent in agents:
+            index.append(f"- `{agent.name}` ({agent.role}) — skills: {', '.join(agent.skills) or 'none'}")
+            audit_ws.write_text(
+                f"agents/{agent.name}.md",
+                f"# {agent.name}\n\nRole: {agent.role}\nDescription: {agent.description}\n"
+                f"Skills: {', '.join(agent.skills) or 'none'}\n\n## Instructions\n\n{agent.system_prompt}\n",
+            )
+        step_skills = {s.id: s.skills for s in self.workflow.steps if s.skills}
+        if step_skills:
+            index += ["", "## Extra skills attached to steps", ""] + [f"- step `{k}`: {', '.join(v)}" for k, v in step_skills.items()]
+        index += ["", "## Skills", ""]
+        for name in used:
+            skill = self.skills.get(name)
+            lock = self.skills.lock.get(name, {})
+            index.append(f"- `{name}` — {self.skills.sources[name].describe()} (pinned {lock.get('commit', 'local')[:10]}): {skill.description}")
+            audit_ws.write_text(f"skills/{name}/SKILL.md", (skill.root / "SKILL.md").read_text(encoding="utf-8"))
+            audit_ws.write_text(f"skills/{name}/FILES.txt", "\n".join(skill.files) + "\n")
+        index += ["", "## Upstream updates available", ""]
+        if updates:
+            for u in updates:
+                index.append(f"- `{u.name}`: {(u.locked or 'none')[:10]} → {u.latest[:10]}; changed: {', '.join(u.changed_files)}")
+                audit_ws.write_text(f"updates/{u.name}.diff", u.skill_md_diff or "(SKILL.md unchanged; other files changed)\n")
+        else:
+            index.append("- none")
+        audit_ws.write_text("house-style.md", self.project.house_style or "(none)")
+        audit_ws.write_text("README.md", "\n".join(index) + "\n")
+
+        auditor = self.agents[SKILL_AUDITOR_AGENT]
+        lane = Lane(key="main", workspace=str(pack))
+        runner = self._new_runner(auditor, lane, StepSpec(id="preflight", agent=auditor.name), reviewer=True)
+        content = [
+            {"type": "text", "text": "Audit the skills used by this workflow. Start with `README.md` in your workspace; "
+                                     "agent instructions are in `agents/`, skills in `skills/`, upstream diffs in `updates/`, "
+                                     "and the operator's standing preferences in `house-style.md`."},
+            {"type": "text", "text": "\n".join(index)},
+            {"type": "text", "text": f"When you are done, call `{runner.terminal}`."},
+        ]
+        try:
+            result = runner.start(content)
+        finally:
+            usage = runner.pop_usage()
+            self.preflight["usage"] = asdict(usage)
+        report_lines = [
+            "# Skill audit", "", result.summary.strip(), "", "## Upstream updates", "",
+            *([f"- {u.name}: {', '.join(u.changed_files)}" for u in updates] or ["- none"]),
+            "", "## Findings", "", format_issues(result.issues),
+        ]
+        report_path = self.run_dir / "preflight" / "skill-audit.md"
+        report_path.write_text("\n".join(report_lines) + "\n", encoding="utf-8")
+        self.print(f"  ✔ {auditor.name}: {len(result.issues)} finding(s), {len(updates)} update(s) available")
+        return {"report": "\n".join(report_lines), "report_path": str(report_path), "updatable": [u.name for u in updates]}
+
     # --- steps -------------------------------------------------------------------------
 
-    def _run_step(self, step: StepSpec, rec: StepRecord) -> None:
+    def _run_step(self, step: StepSpec, rec: StepRecord, resume: bool = False) -> None:
         spec = self.agents[step.agent]
         rec.status = "running"
         rec.error = None
         rec.chosen = None
         started = time.monotonic()
-        self.print(f"\n▶ Step '{step.id}' — {spec.name} ({spec.role})")
-        self._event("step_started", step=step.id, agent=spec.name)
+        self.print(f"\n▶ Step '{step.id}' — {spec.name} ({spec.role})" + (" — continuing" if resume else ""))
+        self._event("step_started", step=step.id, agent=spec.name, resume=resume)
 
         try:
             args = _clean_args(resolve_refs(step.inputs, self.inputs, self.records))
             self._apply_defaults(spec, args, step.id)
-            rec.lanes = self._make_lanes(step)
+            if not resume or not rec.lanes:
+                resume = False
+                rec.lanes = self._make_lanes(step)
             self._save_state("running")
+            todo = [l for l in rec.lanes if l.status not in ("done", "rejected", "failed")] if resume else rec.lanes
+            run = self._continue_lane if resume else self._run_lane
 
-            if len(rec.lanes) == 1:
-                self._run_lane(step, rec, rec.lanes[0], args)
-            else:
+            if len(todo) == 1 or (len(todo) > 1 and resume):
+                for lane in todo:  # resumed lanes run one at a time to spare usage limits
+                    run(step, rec, lane, args)
+            elif todo:
                 parallel = step.variants.parallel if step.variants else True
                 self.print(f"  ⑂ {len(rec.lanes)} variants{' in parallel' if parallel else ''}")
-                if parallel:
-                    with ThreadPoolExecutor(max_workers=len(rec.lanes)) as pool:
-                        list(pool.map(lambda lane: self._run_lane(step, rec, lane, args), rec.lanes))
+                if parallel and self.backend == "api":
+                    with ThreadPoolExecutor(max_workers=len(todo)) as pool:
+                        list(pool.map(lambda lane: run(step, rec, lane, args), todo))
                 else:
-                    for lane in rec.lanes:
-                        self._run_lane(step, rec, lane, args)
+                    for lane in todo:
+                        run(step, rec, lane, args)
 
             if all(lane.status == "failed" for lane in rec.lanes):
                 raise WorkflowError("; ".join(
@@ -563,6 +762,10 @@ class Orchestrator:
                 ))
             self._checkpoint_loop(step, rec)
         except (RunPaused, RunStopped):
+            raise
+        except UsageLimitReached:
+            if rec.status != "awaiting_approval":
+                rec.status = "interrupted"
             raise
         except Exception as exc:
             rec.status = "failed"
@@ -623,16 +826,26 @@ class Orchestrator:
                 staged=self.staged,
                 instructions=instructions,
                 closing=f"Carry out your role on these inputs. When you are done, call `{runner.terminal}`.",
+                inline_images=self.backend == "api",
             )
             lane.rounds = 1
-            lane.result = runner.start(content)
-            lane.usage.merge(runner.pop_usage())
+            lane.phase = "producer"
+            try:
+                lane.result = runner.start(content)
+            finally:
+                lane.usage.merge(runner.pop_usage())
+                if getattr(runner, "started", True) or lane.result:
+                    self._save_runner(step.id, lane, runner)
             self._report_result(lane.result, lane)
-            self._save_runner(step.id, lane, runner)
+            self._write_report(step, lane)
             if step.review:
                 self._review_loop(step, rec, lane, runner)
             if lane.status == "running":
                 lane.status = "done"
+        except UsageLimitReached as exc:
+            lane.status = "interrupted"
+            lane.error = str(exc)
+            raise
         except Exception as exc:
             lane.status = "failed"
             lane.error = str(exc)
@@ -641,11 +854,50 @@ class Orchestrator:
         finally:
             self._save_state("running")
 
+    def _continue_lane(self, step: StepSpec, rec: StepRecord, lane: Lane, args: dict[str, Any]) -> None:
+        """Pick up a lane that was interrupted (usage limit, crash) where it left off, if possible."""
+        try:
+            runner = self._restore_runner(step, lane)
+        except Exception:
+            runner = None
+        if runner is None or not getattr(runner, "started", bool(getattr(runner, "messages", None))):
+            self._run_lane(step, rec, lane, args)  # nothing to continue: start the lane again
+            return
+        lane.status = "running"
+        try:
+            if lane.phase == "producer":
+                self.print(f"  ↺ {self._prefix(rec, lane)}continuing {runner.spec.name} where it stopped")
+                try:
+                    lane.result = runner.follow_up(
+                        "You were interrupted before finishing (for example by a usage limit). Check the workspace "
+                        f"for what you already did, finish the task, then finish with `{runner.terminal}`."
+                    )
+                finally:
+                    lane.usage.merge(runner.pop_usage())
+                    self._save_runner(step.id, lane, runner)
+                self._report_result(lane.result, lane)
+                self._write_report(step, lane)
+            if step.review and lane.result is not None:
+                self._review_loop(step, rec, lane, runner)
+            if lane.status == "running":
+                lane.status = "done"
+        except UsageLimitReached as exc:
+            lane.status = "interrupted"
+            lane.error = str(exc)
+            raise
+        except Exception as exc:
+            lane.status = "failed"
+            lane.error = str(exc)
+            self.print(f"  ✖ {self._prefix(rec, lane)}failed: {exc}")
+        finally:
+            self._save_state("running")
+
     def _review_loop(self, step: StepSpec, rec: StepRecord, lane: Lane, producer: AgentRunner) -> None:
         review = step.review
         reviewer_spec = self.agents[review.agent]
         prefix = self._prefix(rec, lane)
         for round_no in range(1, review.max_rounds + 1):
+            lane.phase = "review"
             self.print(f"  ↳ {prefix}review round {round_no}/{review.max_rounds} — {reviewer_spec.name}")
             args = _clean_args(resolve_refs(review.inputs, self.inputs, self.records))
             args[REVIEW_WORK_ARG] = StepRecord(id=rec.id, agent=rec.agent, lanes=[lane]).handoff()
@@ -656,6 +908,7 @@ class Orchestrator:
                 args,
                 staged=self.staged,
                 closing="Review the work above against your criteria, then call `submit_review`.",
+                inline_images=self.backend == "api",
             )
             verdict = reviewer.start(content)
             lane.usage.merge(reviewer.pop_usage())
@@ -669,6 +922,7 @@ class Orchestrator:
             if round_no == review.max_rounds:
                 break
             lane.rounds += 1
+            lane.phase = "producer"
             self.print(f"  ↻ {prefix}revising ({producer.spec.name}), round {lane.rounds}")
             feedback = (
                 f"The {reviewer_spec.name} agent reviewed your work and asked for changes.\n\n"
@@ -677,10 +931,12 @@ class Orchestrator:
                 "notes instead of changing it. Then call `complete_task` again with an updated summary and "
                 "the full list of files you have created or changed."
             )
-            lane.result = producer.follow_up(feedback)
-            lane.usage.merge(producer.pop_usage())
+            try:
+                lane.result = producer.follow_up(feedback)
+            finally:
+                lane.usage.merge(producer.pop_usage())
+                self._save_runner(step.id, lane, producer)
             self._report_result(lane.result, lane)
-            self._save_runner(step.id, lane, producer)
 
         msg = f"review not approved after {review.max_rounds} round(s)"
         self._event("review_rejected", step=step.id, lane=lane.key)
@@ -700,7 +956,14 @@ class Orchestrator:
                 lanes=[lane.view() for lane in rec.lanes],
                 gallery=None,
                 run_dir=self.run_dir,
+                fix_target=self.workflow.step(step.fixes).agent if step.fixes else None,
+                report=self._report_path(step) if self._report_path(step).is_file() else None,
             )
+            if step.fixes:  # report-only check: preview the page it checked
+                target = self.records[step.fixes].result
+                for lane_view in view.lanes:
+                    lane_view.files = list(target.files) if target else []
+                    lane_view.workspace = self.workspace.root
             if self._checkpoint_enabled(step):
                 view.gallery = build_gallery(view, self.run_dir / "checkpoints" / f"{step.id}.html")
                 rec.status = "awaiting_approval"
@@ -747,7 +1010,14 @@ class Orchestrator:
                 return
 
             if decision.action == "revise":
-                self._human_revision(step, rec, lane, decision.feedback)
+                try:
+                    if step.fixes:
+                        self._fix_via(step, rec, lane, decision.feedback)
+                    else:
+                        self._human_revision(step, rec, lane, decision.feedback)
+                except UsageLimitReached:
+                    rec.status = "awaiting_approval"  # your request can be given again after the reset
+                    raise
                 continue
 
             raise WorkflowError(f"unknown checkpoint decision '{decision.action}'")
@@ -766,15 +1036,104 @@ class Orchestrator:
             "Their direction takes priority over earlier reviewer feedback. Update the workspace files, "
             f"then call `{runner.terminal}` again with an updated summary and the full list of files."
         )
-        lane.result = runner.follow_up(message)
-        lane.usage.merge(runner.pop_usage())
+        try:
+            lane.result = runner.follow_up(message)
+        finally:
+            lane.usage.merge(runner.pop_usage())
+            self._save_runner(step.id, lane, runner)
         self._report_result(lane.result, lane)
-        self._save_runner(step.id, lane, runner)
+        self._write_report(step, lane)
         if step.review:
             self._review_loop(step, rec, lane, runner)
         if lane.status == "running":
             lane.status = "done"
         self._save_state("running")
+
+    def _fix_via(self, step: StepSpec, rec: StepRecord, lane: Lane, feedback: str) -> None:
+        """Report-only reviewer step: send the fixes you asked for to the target step's agent, then re-check."""
+        target_step = self.workflow.step(step.fixes)
+        target_rec = self.records[target_step.id]
+        tlane = target_rec.chosen_lane
+        if tlane is None or tlane.result is None:
+            raise WorkflowError(f"step '{target_step.id}' has no result to fix")
+        ask = "Fix every issue in the report." if feedback.strip().lower() in ("all", "fix all") else feedback.strip()
+        rec.status = "running"
+        self.print(f"  ✎ sending fixes to {target_rec.agent} (step '{target_step.id}')")
+
+        variant_ws = Path(tlane.workspace).resolve() != self.workspace.root
+        if variant_ws:  # the target agent works in its own folder; bring it up to date first
+            _replace_tree(self.workspace.root, Path(tlane.workspace))
+        runner = self._runners.get((target_step.id, tlane.key)) or self._restore_runner(target_step, tlane)
+        report = lane.result
+        message = (
+            f"The {rec.agent} agent checked the work (step '{step.id}') and reported:\n\n{report.summary}\n\n"
+            f"Issues:\n{format_issues(report.issues)}\n\n"
+            f"The human operator asks you to: {ask}\n\n"
+            "Make those changes in the workspace files (only what was asked), then finish with "
+            f"`{runner.terminal}` again: an updated summary and the full list of files you have created or changed."
+        )
+        tlane.human_feedback.append(f"(after {step.id}) {ask}")
+        try:
+            tlane.result = runner.follow_up(message)
+        finally:
+            tlane.usage.merge(runner.pop_usage())
+            self._save_runner(target_step.id, tlane, runner)
+        self._report_result(tlane.result, tlane)
+        if variant_ws:
+            _replace_tree(Path(tlane.workspace), self.workspace.root)
+
+        lane.human_feedback.append(ask)
+        lane.rounds += 1
+        self.print(f"  ↳ re-checking — {rec.agent}")
+        spec = self.agents[step.agent]
+        args = _clean_args(resolve_refs(step.inputs, self.inputs, self.records))
+        self._apply_defaults(spec, args, step.id)
+        checker = self._new_runner(spec, lane, step)
+        self._runners[(step.id, lane.key)] = checker
+        recheck = (
+            f"This is a re-check. Fixes were just applied for: {ask}\n"
+            "Verify those fixes first, then check everything else again as usual."
+        )
+        content = build_task_content(
+            spec.inputs, args, staged=self.staged,
+            instructions=f"{step.instructions}\n\n{recheck}" if step.instructions else recheck,
+            closing=f"Carry out your role on these inputs. When you are done, call `{checker.terminal}`.",
+            inline_images=self.backend == "api",
+        )
+        try:
+            lane.result = checker.start(content)
+        finally:
+            lane.usage.merge(checker.pop_usage())
+            self._save_runner(step.id, lane, checker)
+        lane.status = "done"
+        self._report_result(lane.result, lane)
+        self._write_report(step, lane)
+        self._save_state("running")
+
+    def _report_path(self, step: StepSpec) -> Path:
+        return self.workspace.root / "reports" / f"{step.id}.md"
+
+    def _write_report(self, step: StepSpec, lane: Lane) -> None:
+        """Save a reviewer step's verdict as a readable report in the workspace."""
+        r = lane.result
+        if r is None or r.role != "reviewer" or lane.key != "main":
+            return
+        lines = [
+            f"# {step.id}: {r.agent}",
+            "",
+            f"**Verdict:** {r.verdict}",
+            "",
+            r.summary.strip(),
+            "",
+            "## Issues",
+            "",
+            format_issues(r.issues),
+        ]
+        if lane.human_feedback:
+            lines += ["", "## Fixes requested so far", ""] + [f"- {fb}" for fb in lane.human_feedback]
+        path = self._report_path(step)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     def _adopt(self, rec: StepRecord, lane: Lane) -> None:
         rec.chosen = lane.key
@@ -786,7 +1145,8 @@ class Orchestrator:
     def _new_runner(self, spec: AgentSpec, lane: Lane, step: StepSpec, reviewer: bool = False) -> AgentRunner:
         skill_names = list(dict.fromkeys(spec.skills + ([] if reviewer else step.skills)))
         skills = [self.skills.get(n) for n in skill_names] if skill_names else []
-        return AgentRunner(
+        runner_cls = ClaudeCodeRunner if self.backend == "claude-code" else AgentRunner
+        return runner_cls(
             spec,
             self.client,
             Workspace(lane.workspace),
@@ -888,6 +1248,7 @@ class Orchestrator:
                     {n: self.skills.lock.get(n, {}).get("commit", "local") for n in sorted(self._skills_used())}
                     if self.skills else {}
                 ),
+                "preflight": getattr(self, "preflight", {}),
                 "steps": [rec.to_dict() for rec in self.records.values()],
             }
             tmp = self.run_dir / "run.json.tmp"

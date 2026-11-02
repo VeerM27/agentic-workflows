@@ -33,8 +33,10 @@ REF_PATTERN = re.compile(r"\$\{\s*(inputs|steps)\.([A-Za-z0-9_\-]+)(?:\.([A-Za-z
 _AGENT_KEYS = {"version", "name", "description", "role", "model", "effort", "max_tokens", "max_turns",
                "tools", "skills", "inputs", "system_prompt", "instructions"}
 _INPUT_KEYS = {"type", "required", "description", "default", "library"}
-_WORKFLOW_KEYS = {"version", "name", "description", "agents_dir", "inputs", "steps", "checkpoints"}
-_STEP_KEYS = {"id", "agent", "inputs", "instructions", "review", "skills", "variants", "checkpoint"}
+_WORKFLOW_KEYS = {"version", "name", "description", "agents_dir", "inputs", "steps", "checkpoints", "preflight"}
+_STEP_KEYS = {"id", "agent", "inputs", "instructions", "review", "skills", "variants", "checkpoint", "fixes"}
+PREFLIGHT_CHECKS = {"skill_audit"}
+SKILL_AUDITOR_AGENT = "skill_auditor"
 _REVIEW_KEYS = {"agent", "max_rounds", "inputs", "on_reject"}
 _VARIANT_KEYS = {"count", "directions", "parallel"}
 
@@ -131,6 +133,7 @@ class StepSpec:
     skills: list[str] = field(default_factory=list)
     variants: VariantSpec | None = None
     checkpoint: bool | None = None  # None = follow workflow / project setting
+    fixes: str | None = None  # reviewer steps: the earlier step whose agent applies fixes you approve
 
 
 @dataclass
@@ -141,6 +144,7 @@ class WorkflowSpec:
     steps: list[StepSpec]
     agents_dir: Path
     checkpoints: Any = None  # "all" | "none" | [step ids]; None = project setting
+    preflight: list[str] = field(default_factory=list)
     source: Path | None = None
 
     def step(self, step_id: str) -> StepSpec:
@@ -307,6 +311,7 @@ def load_workflow(path: str | Path, agents_dir: str | Path | None = None) -> Wor
                 skills=_str_list(raw.get("skills"), step_where, "skills"),
                 variants=_parse_variants(raw.get("variants"), step_where),
                 checkpoint=checkpoint,
+                fixes=raw.get("fixes"),
             )
         )
 
@@ -317,6 +322,7 @@ def load_workflow(path: str | Path, agents_dir: str | Path | None = None) -> Wor
         steps=steps,
         agents_dir=agents_dir,
         checkpoints=data.get("checkpoints"),
+        preflight=_str_list(data.get("preflight"), where, "preflight"),
         source=path,
     )
 
@@ -381,6 +387,17 @@ def validate_workflow(
     if cp is not None and cp not in ("all", "none") and not isinstance(cp, list):
         errors.append("workflow: 'checkpoints' must be 'all', 'none' or a list of step ids")
 
+    for check in workflow.preflight:
+        if check not in PREFLIGHT_CHECKS:
+            errors.append(f"workflow: unknown preflight check '{check}' (available: {sorted(PREFLIGHT_CHECKS)})")
+    if "skill_audit" in workflow.preflight:
+        auditor = agents.get(SKILL_AUDITOR_AGENT)
+        if auditor is None:
+            errors.append(f"workflow: preflight 'skill_audit' needs an agent named '{SKILL_AUDITOR_AGENT}'")
+        elif auditor.role != "reviewer":
+            errors.append(f"workflow: agent '{SKILL_AUDITOR_AGENT}' must have role 'reviewer'")
+
+    producer_steps: set[str] = set()
     for step in workflow.steps:
         where = f"step '{step.id}'"
         if step.id in seen_steps:
@@ -411,6 +428,14 @@ def validate_workflow(
                 errors.append(f"{rwhere}: only producer steps can have a review loop")
             check_refs(step.review.inputs, rwhere)
 
+        if step.fixes is not None:
+            if agent is not None and agent.role != "reviewer":
+                errors.append(f"{where}: 'fixes' is only for reviewer steps")
+            if step.fixes not in producer_steps:
+                errors.append(f"{where}: 'fixes: {step.fixes}' must name an earlier producer step")
+
+        if agent is not None and agent.role == "producer":
+            producer_steps.add(step.id)
         seen_steps.append(step.id)
 
     if isinstance(cp, list):

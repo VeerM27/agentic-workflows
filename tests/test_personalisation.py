@@ -187,3 +187,15 @@ def test_terminal_approver_parses_commands(tmp_path):
 
     approver = TerminalApprover(input_fn=lambda _: "s", print_fn=lambda *_: None)
     assert approver.decide(_view(tmp_path, ["main"])).action == "stop"
+
+
+def test_terminal_approver_skill_audit_choices(tmp_path):
+    from agentflow.checkpoints import PreflightView
+
+    view = PreflightView(report="# Skill audit", report_path=tmp_path / "r.md", updatable=["frontend-design"])
+    approver = TerminalApprover(input_fn=lambda _: "u", print_fn=lambda *_: None)
+    assert approver.decide_preflight(view) == Decision("update", feedback="frontend-design")
+    approver = TerminalApprover(input_fn=lambda _: "u theme-factory, frontend-design", print_fn=lambda *_: None)
+    assert approver.decide_preflight(view).feedback == "theme-factory,frontend-design"
+    approver = TerminalApprover(input_fn=lambda _: "c", print_fn=lambda *_: None)
+    assert approver.decide_preflight(view).action == "approve"

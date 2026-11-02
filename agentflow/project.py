@@ -18,6 +18,8 @@ CONFIG_NAME = "agentflow.yaml"
 SUPPORTED_VERSION = 1
 
 APPROVAL_MODES = {"terminal", "pause", "auto"}
+BACKENDS = {"claude-code", "api"}
+SKILL_AUDIT_MODES = {"on_change", "always", "off"}
 
 # Used when there is no agentflow.yaml at all.
 BUILTIN_MODELS = {"default": "claude-opus-5-5", "fast": "claude-sonnet-5-5"}
@@ -40,6 +42,8 @@ class ProjectConfig:
     checkpoints: Any = "all"  # "all" | "none" | [step ids]
     notify_command: str | None = None
     runs_dir: Path = Path("runs")
+    backend: str = "api"  # "claude-code" runs agents on your Claude subscription; "api" uses an API key
+    skill_audit: str = "on_change"
     source: Path | None = None
 
     def resolve_model(self, name: str | None) -> str:
@@ -72,7 +76,7 @@ class ProjectConfig:
             pass  # a broken notifier must never break a run
 
 
-_KNOWN_KEYS = {"version", "models", "defaults", "house_style", "skills", "approvals", "notify", "runs_dir"}
+_KNOWN_KEYS = {"version", "backend", "models", "defaults", "house_style", "skills", "approvals", "notify", "runs_dir"}
 
 
 def find_config(start: Path) -> Path | None:
@@ -115,7 +119,14 @@ def load_project(path: str | Path | None = None, *, search_from: str | Path = ".
         raise ProjectError(f"{where}: approvals.mode must be one of {sorted(APPROVAL_MODES)}")
 
     def rel(p: str | None) -> Path | None:
-        return (root / p).resolve() if p else None
+        return (root / Path(p).expanduser()).resolve() if p else None
+
+    backend = data.get("backend", "api")
+    if backend not in BACKENDS:
+        raise ProjectError(f"{where}: backend must be one of {sorted(BACKENDS)}")
+    skill_audit = skills.get("audit", "on_change")
+    if skill_audit not in SKILL_AUDIT_MODES:
+        raise ProjectError(f"{where}: skills.audit must be one of {sorted(SKILL_AUDIT_MODES)}")
 
     house_style = rel(data.get("house_style"))
     if house_style and not house_style.is_file():
@@ -133,5 +144,7 @@ def load_project(path: str | Path | None = None, *, search_from: str | Path = ".
         checkpoints=approvals.get("checkpoints", "all"),
         notify_command=notify.get("command"),
         runs_dir=rel(data.get("runs_dir", "runs")),
+        backend=backend,
+        skill_audit=skill_audit,
         source=cfg_path,
     )

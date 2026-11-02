@@ -137,6 +137,8 @@ def cmd_resume(args) -> int:
     from .orchestrator import Orchestrator
 
     decisions = []
+    if args.update_skills:
+        decisions.append(Decision("update", feedback=args.update_skills))
     if args.feedback:
         decisions.append(Decision("revise", args.lane, args.feedback))
     if args.approve or args.choose:
@@ -185,6 +187,121 @@ def cmd_skills(args) -> int:
     return 0
 
 
+def cmd_screenshot(args) -> int:
+    from .tools import ToolError, render_html_screenshot
+
+    target = Path(args.html).resolve()
+    if not target.is_file():
+        print(f"error: {args.html} not found", file=sys.stderr)
+        return 2
+    out = Path(args.out)
+    if out.suffix.lower() != ".png":
+        print("error: --out must be a .png file", file=sys.stderr)
+        return 2
+    try:
+        png = render_html_screenshot(target, width=args.width, full_page=args.full_page, scroll_y=args.scroll_y)
+    except ToolError as exc:
+        print(f"screenshot unavailable: {exc}", file=sys.stderr)
+        return 1
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(png)
+    where = f" at scroll_y={args.scroll_y}" if args.scroll_y is not None else ""
+    print(f"Saved {out} ({args.width}px wide{where}). Open it with the Read tool to see it.")
+    return 0
+
+
+def cmd_contrast(args) -> int:
+    from .tools import ToolError, contrast_ratio
+
+    colours = args.colours
+    if len(colours) < 2 or len(colours) % 2:
+        print("error: give colours in foreground/background pairs", file=sys.stderr)
+        return 2
+    try:
+        for fg, bg in zip(colours[::2], colours[1::2]):
+            ratio = contrast_ratio(fg, bg)
+            verdict = "AAA" if ratio >= 7 else "AA" if ratio >= 4.5 else "AA large text only" if ratio >= 3 else "FAIL"
+            print(f"{fg} on {bg}: {ratio:.2f}:1 — {verdict}")
+    except ToolError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    return 0
+
+
+def cmd_doctor(args) -> int:
+    import json as _json
+    import os
+    import shutil
+    import subprocess
+
+    from .backends.claude_code import API_CREDENTIAL_VARS, claude_binary
+
+    project = _project(args)
+    ok = True
+
+    def line(good: bool, text: str) -> None:
+        nonlocal ok
+        ok = ok and good
+        print(f"  {'✓' if good else '✗'} {text}")
+
+    print(f"Project: {project.source or '(no agentflow.yaml)'}")
+    print(f"Backend: {project.backend}")
+    if project.backend == "claude-code":
+        binary = claude_binary()
+        found = shutil.which(binary) or (binary if Path(binary).is_file() else None)
+        line(bool(found), f"Claude Code CLI: {found or 'not found — install Claude Code'}")
+        if found:
+            version = subprocess.run([binary, "--version"], capture_output=True, text=True, timeout=30)
+            print(f"      {version.stdout.strip() or version.stderr.strip()}")
+            env = {k: v for k, v in os.environ.items() if k not in API_CREDENTIAL_VARS}
+            status = subprocess.run([binary, "auth", "status", "--json"], capture_output=True, text=True, timeout=30, env=env)
+            try:
+                info = _json.loads(status.stdout)
+            except ValueError:
+                info = {}
+            logged_in = bool(info.get("loggedIn", info.get("logged_in", status.returncode == 0)))
+            method = info.get("authMethod") or info.get("auth_method") or info.get("subscriptionType") or ""
+            line(logged_in, f"Logged in to Claude Code{f' ({method})' if method else ''}" if logged_in
+                 else "Not logged in — run `claude auth login` with your Claude (Pro/Max) account")
+        for var in API_CREDENTIAL_VARS:
+            if os.environ.get(var):
+                print(f"  ! {var} is set in your shell. agentflow removes it for Claude Code runs so your "
+                      "subscription is used, but other tools may bill the API.")
+    else:
+        line(bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")),
+             "API credentials (ANTHROPIC_API_KEY) for backend 'api'")
+
+    try:
+        import playwright  # noqa: F401
+
+        line(True, "Playwright installed (screenshots available)")
+    except ImportError:
+        print("  ! Playwright not installed — screenshots unavailable (`pip install -e '.[render]'`)")
+    if project.skills_manifest and project.skills_manifest.is_file():
+        problems = SkillLibrary(project.skills_manifest).verify()
+        line(not problems, "Skills match the lockfile" if not problems else "Skills: " + "; ".join(problems))
+    print(f"Runs are saved in: {project.runs_dir}")
+    return 0 if ok else 1
+
+
+def cmd_serve(args) -> int:
+    import functools
+    import http.server
+
+    run_dir = Path(args.run_dir)
+    root = run_dir / "workspace" / "site"
+    if not root.is_dir():
+        root = run_dir / "workspace" if (run_dir / "workspace").is_dir() else run_dir
+    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(root))
+    with http.server.ThreadingHTTPServer(("127.0.0.1", args.port), handler) as httpd:
+        print(f"Serving {root}\nOpen http://127.0.0.1:{httpd.server_address[1]}/  (Ctrl-C to stop)")
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            pass
+    return 0
+
+
 # --- parser ------------------------------------------------------------------------------
 
 
@@ -217,6 +334,7 @@ def build_parser() -> argparse.ArgumentParser:
     res.add_argument("--choose", metavar="VARIANT", help="approve and continue with this variant (e.g. v2)")
     res.add_argument("--feedback", help="request changes at the pending checkpoint")
     res.add_argument("--lane", metavar="VARIANT", help="which variant the feedback is for")
+    res.add_argument("--update-skills", metavar="NAMES", help="at the skill audit: update these skills (comma-separated), then continue")
     approval_flags(res)
     res.set_defaults(func=cmd_resume)
 
@@ -231,6 +349,26 @@ def build_parser() -> argparse.ArgumentParser:
 
     pr = sub.add_parser("profiles", help="list profile libraries (e.g. industries)")
     pr.set_defaults(func=cmd_profiles)
+
+    shot = sub.add_parser("screenshot", help="screenshot an HTML file (used by agents)")
+    shot.add_argument("html")
+    shot.add_argument("--out", required=True, help="PNG file to write")
+    shot.add_argument("--width", type=int, default=1280)
+    shot.add_argument("--scroll-y", type=int, help="scroll position in pixels (captures one viewport)")
+    shot.add_argument("--full-page", action="store_true", help="capture the whole page (ignored with --scroll-y)")
+    shot.set_defaults(func=cmd_screenshot)
+
+    con = sub.add_parser("contrast", help="WCAG contrast ratios for colour pairs (used by agents)")
+    con.add_argument("colours", nargs="+", metavar="COLOUR", help="foreground background [foreground background ...]")
+    con.set_defaults(func=cmd_contrast)
+
+    doc = sub.add_parser("doctor", help="check your setup (Claude Code login, screenshots, skills)")
+    doc.set_defaults(func=cmd_doctor)
+
+    srv = sub.add_parser("serve", help="view a finished page in your browser")
+    srv.add_argument("run_dir")
+    srv.add_argument("--port", type=int, default=8000)
+    srv.set_defaults(func=cmd_serve)
 
     sk = sub.add_parser("skills", help="manage pinned Claude Code skills")
     sk.add_argument("action", choices=["list", "sync", "update", "verify"])

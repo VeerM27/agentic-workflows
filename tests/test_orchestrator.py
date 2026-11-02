@@ -15,6 +15,7 @@ from agentflow import (
 from agentflow.agent import AgentError, AgentRunner
 from agentflow.orchestrator import WorkflowError
 from agentflow.workspace import Workspace
+from conftest import api_project
 from fakes import FakeClient, message, text, tool_call
 
 ROOT = Path(__file__).parent.parent
@@ -59,7 +60,7 @@ def test_design_review_loop_revises_until_approved(tmp_path):
         }
     )
     wf, agents = design_workflow()
-    orch = Orchestrator(wf, agents, client=client, runs_dir=tmp_path / "runs", approver=AutoApprover(), **QUIET)
+    orch = Orchestrator(wf, agents, project=api_project(), client=client, runs_dir=tmp_path / "runs", approver=AutoApprover(), **QUIET)
     result = orch.run(
         {"brief": "A landing page", "references": str(ref), "industry": "fintech"}, base_dir=tmp_path, run_id="t1"
     )
@@ -111,7 +112,7 @@ def test_rejected_review_can_fail_the_run(tmp_path):
     wf, agents = design_workflow()
     wf.steps[0].review.max_rounds = 1
     wf.steps[0].review.on_reject = "fail"
-    orch = Orchestrator(wf, agents, client=client, runs_dir=tmp_path, approver=AutoApprover(), **QUIET)
+    orch = Orchestrator(wf, agents, project=api_project(), client=client, runs_dir=tmp_path, approver=AutoApprover(), **QUIET)
     with pytest.raises(WorkflowError, match="not approved"):
         orch.run({"brief": "x"}, run_id="t2")
     state = json.loads((tmp_path / "t2" / "run.json").read_text())
@@ -134,7 +135,7 @@ def webapp_script(**overrides):
 def test_handoff_flows_between_steps(tmp_path):
     wf = load_workflow(ROOT / "workflows" / "webapp.yaml")
     client = FakeClient(webapp_script())
-    orch = Orchestrator(wf, client=client, runs_dir=tmp_path, approver=AutoApprover(), **QUIET)
+    orch = Orchestrator(wf, project=api_project(), client=client, runs_dir=tmp_path, approver=AutoApprover(), **QUIET)
     result = orch.run({"brief": "habit tracker", "industry": "artisan bakery"}, run_id="t3")
     assert result.status == "done"
 
@@ -158,7 +159,7 @@ def test_human_feedback_at_checkpoint_goes_to_producer_then_reviewer(tmp_path):
     )
     wf, agents = design_workflow()
     approver = ScriptedApprover([Decision("revise", None, "make the hero much bigger"), Decision("approve")], AutoApprover())
-    orch = Orchestrator(wf, agents, client=client, runs_dir=tmp_path, approver=approver, **QUIET)
+    orch = Orchestrator(wf, agents, project=api_project(), client=client, runs_dir=tmp_path, approver=approver, **QUIET)
     result = orch.run({"brief": "x"}, run_id="h1")
 
     assert result.status == "done"
@@ -177,7 +178,7 @@ def test_pause_then_resume_with_feedback_and_approval(tmp_path):
     wf = load_workflow(ROOT / "workflows" / "webapp.yaml")
     wf.checkpoints = ["spec"]  # only the spec step asks the human
     first = FakeClient({"product_planner": [write("docs/spec.md", "# v1"), finish(["docs/spec.md"], summary="first spec")]})
-    orch = Orchestrator(wf, client=first, runs_dir=tmp_path, approver=PauseApprover(), **QUIET)
+    orch = Orchestrator(wf, project=api_project(), client=first, runs_dir=tmp_path, approver=PauseApprover(), **QUIET)
     paused = orch.run({"brief": "habit tracker"}, run_id="p1")
 
     assert paused.status == "paused"
@@ -193,6 +194,7 @@ def test_pause_then_resume_with_feedback_and_approval(tmp_path):
         tmp_path / "p1",
         decisions=[Decision("revise", None, "add streak tracking")],
         approval_mode="auto",
+        project=api_project(),
         client=second,
         **QUIET,
     )
@@ -204,7 +206,7 @@ def test_pause_then_resume_with_feedback_and_approval(tmp_path):
     assert (done.workspace / "docs/spec.md").read_text() == "# v2 with streaks"
     assert [s.status for s in done.steps] == ["done"] * 4
     with pytest.raises(WorkflowError, match="already finished"):
-        Orchestrator.resume(tmp_path / "p1", client=second, **QUIET)
+        Orchestrator.resume(tmp_path / "p1", project=api_project(), client=second, **QUIET)
 
 
 def test_variants_run_in_isolated_workspaces_and_the_chosen_one_is_adopted(tmp_path):
@@ -218,7 +220,7 @@ def test_variants_run_in_isolated_workspaces_and_the_chosen_one_is_adopted(tmp_p
     )
     wf, agents = design_workflow()
     approver = ScriptedApprover([Decision("approve", "v2")], AutoApprover())
-    orch = Orchestrator(wf, agents, client=client, runs_dir=tmp_path, approver=approver, **QUIET)
+    orch = Orchestrator(wf, agents, project=api_project(), client=client, runs_dir=tmp_path, approver=approver, **QUIET)
     result = orch.run({"brief": "x", "variants": 3, "directions": "Brutalist\nPastel"}, run_id="v")
 
     rec = result.steps[0]
@@ -246,7 +248,7 @@ def test_failed_variant_does_not_sink_the_others(tmp_path):
         }
     )
     wf, agents = design_workflow()
-    orch = Orchestrator(wf, agents, client=client, runs_dir=tmp_path, approver=AutoApprover(), **QUIET)
+    orch = Orchestrator(wf, agents, project=api_project(), client=client, runs_dir=tmp_path, approver=AutoApprover(), **QUIET)
     result = orch.run({"brief": "x", "variants": 2}, run_id="f")
     rec = result.steps[0]
     assert rec.lanes[0].status == "failed" and rec.chosen == "v2"
@@ -256,7 +258,7 @@ def test_checkpoints_none_never_asks(tmp_path):
     client = FakeClient({"ux_designer": [write("a.html", "x"), finish(["a.html"])], "design_reviewer": [review("approve")]})
     wf, agents = design_workflow()
     wf.checkpoints = "none"
-    orch = Orchestrator(wf, agents, client=client, runs_dir=tmp_path, approver=PauseApprover(), **QUIET)
+    orch = Orchestrator(wf, agents, project=api_project(), client=client, runs_dir=tmp_path, approver=PauseApprover(), **QUIET)
     assert orch.run({"brief": "x"}, run_id="n").status == "done"
 
 
@@ -328,7 +330,7 @@ def test_refusal_raises(tmp_path):
 
 def test_missing_required_workflow_input(tmp_path):
     wf, agents = design_workflow()
-    orch = Orchestrator(wf, agents, client=FakeClient({}), runs_dir=tmp_path, approver=AutoApprover(), **QUIET)
+    orch = Orchestrator(wf, agents, project=api_project(), client=FakeClient({}), runs_dir=tmp_path, approver=AutoApprover(), **QUIET)
     from agentflow.inputs import InputError
 
     with pytest.raises(InputError, match="brief"):

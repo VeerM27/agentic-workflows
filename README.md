@@ -16,8 +16,12 @@ product_planner ─▶ ux_designer ×3 variants ⇄ design_reviewer ─▶ you p
    (you approve)       (each checked, side-by-side gallery)          (you approve)        (you approve)            (you approve)
 ```
 
+**Runs on your Claude subscription (Pro/Max) through Claude Code. No API key needed.** An API-key
+backend is also available (`backend: api` in `agentflow.yaml`).
+
 | Included workflow | What it does |
 |---|---|
+| `workflows/scroll_landing.yaml` | idea + product photos → skill audit → brief review → plan → design → build → check → security → final review |
 | `workflows/webapp.yaml` | brief → spec → design (N variants) → build → QA |
 | `workflows/design_only.yaml` | text and/or images → designed pages (N variants), checked against design principles |
 | `workflows/palettes.yaml` | N accessible colour palettes with font pairings and a visual preview |
@@ -26,21 +30,52 @@ product_planner ─▶ ux_designer ×3 variants ⇄ design_reviewer ─▶ you p
 **Setting it up for your own work, and keeping it maintainable as models and skills change:**
 see **[docs/SETUP.md](docs/SETUP.md)**.
 
-## Quick start
+## Quick start (Pro plan)
 
 ```bash
 pip install -e '.[render,dev]'
 ```
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...
+claude auth login          # once, with your Claude Pro/Max account
 ```
 
 ```bash
-agentflow run workflows/svg_scroll_animation.yaml \
-  -i brief="A mountain range that draws itself as you scroll, sun rising behind it" \
-  -i industry=travel-tourism -i variants=3
+agentflow doctor           # checks Claude Code login, screenshots, skills
 ```
+
+```bash
+agentflow run workflows/scroll_landing.yaml \
+  -i idea="Landing page for our trail shoe: as you scroll, the shoe is built from its materials" \
+  -i photos=shoe-side.jpg,shoe-sole.jpg,materials.jpg -i industry=ecommerce-retail
+```
+
+```bash
+agentflow serve ~/agentflow-runs/<run>    # view the finished page
+```
+
+### The scroll-landing pipeline
+
+| # | Step | Agent | Model | You see |
+|---|---|---|---|---|
+| 0 | Skill audit | `skill_auditor` | fast | updates, redundancies and gaps in every agent's skills; continue, update, or stop |
+| 1 | Brief review | `brief_reviewer` | fast | `docs/brief-review.md` (fixes, suggestions, questions) and `docs/brief.md` |
+| 2 | Plan | `planner` | fast | `docs/plan.md`: storyboard plus an ordered task list for each agent |
+| 3 | Design | `landing_designer` | default | `design/`: tokens, a frame per scroll stage, SVG parts |
+| 4 | Build | `landing_coder` | default | `site/`: the working page |
+| 5 | Check | `page_checker` | fast | `reports/check.md` |
+| 6 | Security | `security_reviewer` | fast | `reports/security.md` |
+| 7 | Final review | `final_reviewer` | fast | `reports/final.md`, then "ready to view" |
+
+Steps 5–7 only report. At each one you approve, or send specific fixes (or `all`) to the coder,
+who fixes them in the same session; then the check runs again.
+
+`default` and `fast` are model aliases in `agentflow.yaml` (Opus and Sonnet by default).
+
+**Pro-plan usage.** Runs use the same usage limits as your claude.ai chats (a 5-hour window
+plus a weekly limit). If a limit is reached mid-run, the run pauses and saves everything.
+`agentflow resume <run>` continues in the same agent session after the reset. Use one variant
+at a time and keep the skill audit on `on_change` so it only runs when something changed.
 
 At each checkpoint you see a summary, the reviewer verdicts, and a gallery page
 (`runs/<run>/checkpoints/<step>.html`) showing every variant side by side. Then:
@@ -75,6 +110,9 @@ A run that crashes, loses its network connection or is interrupted with Ctrl-C r
 | `agentflow agents` | List agents with their inputs, tools, skills and resolved model |
 | `agentflow profiles` | List profile libraries (industries) |
 | `agentflow skills list\|sync\|update [names]\|verify` | Manage pinned Claude Code skills |
+| `agentflow doctor` | Check Claude Code login, API-key leaks, screenshots, skills |
+| `agentflow serve RUN_DIR` | View a finished page at http://127.0.0.1:8000 |
+| `agentflow screenshot`, `agentflow contrast` | Helpers the agents use (you can too) |
 
 ## How it fits together
 
@@ -156,7 +194,17 @@ outcome, your feedback) or `.summary`, `.files`, `.notes`, `.verdict`, `.issues`
 and review loop. The one you choose becomes the main workspace; the others stay in
 `runs/<run>/variants/` for reference.
 
-## How the Claude calls are made
+## How agents run
+
+**`backend: claude-code` (default)** runs each agent as a Claude Code session (`claude -p`) in its
+workspace folder, using your subscription:
+- **Instructions:** the agent's instructions, your house style and its skills are added to the session.
+- **Tools:** file tools only (reviewers can't write), confined to the workspace, plus the
+  `agentflow screenshot` / `agentflow contrast` helpers. Anything else is denied automatically.
+- **Hand-off:** returned as JSON checked against a schema. Feedback and fixes resume the same session.
+- **Billing:** `ANTHROPIC_API_KEY` is removed from the session's environment, so it can't switch to API billing.
+
+**`backend: api`** calls the Claude API directly with an API key:
 
 - Each agent runs its own tool-use loop over **streamed** requests, with **adaptive thinking** and
   `effort` per agent.
