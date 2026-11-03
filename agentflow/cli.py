@@ -188,7 +188,7 @@ def cmd_skills(args) -> int:
 
 
 def cmd_screenshot(args) -> int:
-    from .tools import ToolError, render_html_screenshot
+    from .tools import ToolError, cli_screenshot_budget, render_html_screenshot
 
     target = Path(args.html).resolve()
     if not target.is_file():
@@ -198,15 +198,27 @@ def cmd_screenshot(args) -> int:
     if out.suffix.lower() != ".png":
         print("error: --out must be a .png file", file=sys.stderr)
         return 2
+    budget, counter = cli_screenshot_budget()
+    try:
+        note = budget.take()
+    except ToolError as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 3
     try:
         png = render_html_screenshot(target, width=args.width, full_page=args.full_page, scroll_y=args.scroll_y)
     except ToolError as exc:
         print(f"screenshot unavailable: {exc}", file=sys.stderr)
         return 1
+    if counter is not None:
+        try:
+            counter.parent.mkdir(parents=True, exist_ok=True)
+            counter.write_text(str(budget.used))
+        except OSError:
+            pass
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_bytes(png)
     where = f" at scroll_y={args.scroll_y}" if args.scroll_y is not None else ""
-    print(f"Saved {out} ({args.width}px wide{where}). Open it with the Read tool to see it.")
+    print(f"Saved {out} ({args.width}px wide{where}). Open it with the Read tool to see it.{note}")
     return 0
 
 

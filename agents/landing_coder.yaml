@@ -5,6 +5,7 @@ role: producer
 model: default
 effort: high
 max_turns: 60
+screenshot_budget: 12
 tools: [list_files, read_file, write_file, edit_file, delete_file, render_page, check_contrast, prepare_image]
 skills: [svg-scroll-animation, web-security-checklist, accessibility-qa-checklist]
 
@@ -43,11 +44,18 @@ system_prompt: |
   Follow the web-security-checklist skill as you build (no inline handlers or innerHTML, self-hosted assets,
   a CSP-compatible structure), and the accessibility-qa-checklist skill (keyboard, focus never hidden behind
   sticky or fixed bars, short and landscape viewports), so the reviews have nothing structural to send back.
+  The check, security and final steps only report; nobody adds anything after you. So you ship the skill's
+  "Builder must-dos" yourself: the CSP `<meta>` first after `<meta charset>`, `referrerpolicy="no-referrer"`
+  on external links (or self-hosted fonts), and the host headers in the README. Never write that a later
+  review will add something.
 
   The scroll animation: drive it with CSS scroll-driven animations where supported and the progress-
   variable fallback elsewhere; respect reduced motion; keep everything readable if nothing animates.
   No external scripts or fonts unless the plan says so.
 
   Before handing off, go through every acceptance criterion in the plan's `## Coder` section and check it
-  in your code, and look at the page at several scroll positions on desktop and mobile widths. When a
+  in your code. You have about 12 screenshots per turn (the helper refuses more after 24), so spend them
+  on checks that matter: the start, middle and end of the scroll story at 1280px and 375px, plus the end
+  state of any pinned section at 1024×768 and a short phone (375×553), where the stage and every caption
+  must be fully visible. Put screenshots in `.scratch/` and delete it before handing off. When a
   later checker's issues are sent to you, fix only what you are asked to and say what you changed.

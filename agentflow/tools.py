@@ -14,6 +14,7 @@ import json
 import os
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable
 
 from .workspace import Workspace, WorkspaceError
@@ -319,14 +320,60 @@ class ToolOutcome:
     is_error: bool = False
 
 
+class ScreenshotBudget:
+    """Caps screenshots per agent turn: a warning once the budget is used, a refusal at twice the budget.
+
+    `budget` None means unlimited. `used` counts screenshots taken in the current turn.
+    """
+
+    def __init__(self, budget: int | None, used: int = 0):
+        self.budget = budget
+        self.used = used
+
+    def take(self) -> str:
+        """Record one screenshot. Returns a note to append (may be empty); raises ToolError when over the hard cap."""
+        if self.budget is None:
+            return ""
+        if self.used >= 2 * self.budget:
+            raise ToolError(
+                f"screenshot budget used up ({self.used} taken; budget {self.budget}). Don't take more: finish "
+                "with what you have and list anything you would still check in your notes for the next agent."
+            )
+        self.used += 1
+        if self.used >= self.budget:
+            return (f" Screenshot budget reached ({self.used} of {self.budget}): take more only for a final check; "
+                    f"they stop working after {2 * self.budget}.")
+        return f" ({self.used} of {self.budget} screenshots used.)"
+
+
+SCREENSHOT_BUDGET_ENV = "AGENTFLOW_SCREENSHOT_BUDGET"
+SCREENSHOT_COUNTER_ENV = "AGENTFLOW_SCREENSHOT_COUNTER"
+
+
+def cli_screenshot_budget() -> tuple[ScreenshotBudget, Path | None]:
+    """The budget for `agentflow screenshot` run inside a Claude Code agent session (from its environment)."""
+    raw = os.environ.get(SCREENSHOT_BUDGET_ENV, "").strip()
+    counter = os.environ.get(SCREENSHOT_COUNTER_ENV, "").strip()
+    if not raw.isdigit() or not counter:
+        return ScreenshotBudget(None), None
+    path = Path(counter)
+    try:
+        used = int(path.read_text().strip() or 0)
+    except (OSError, ValueError):
+        used = 0
+    return ScreenshotBudget(int(raw), used), path
+
+
 class ToolExecutor:
     """Runs workspace tools for one agent."""
 
-    def __init__(self, workspace: Workspace, renderer: Callable[..., bytes] | None = None, skills: dict | None = None):
+    def __init__(self, workspace: Workspace, renderer: Callable[..., bytes] | None = None, skills: dict | None = None,
+                 screenshot_budget: int | None = None):
         self.workspace = workspace
         self._renderer = renderer
         self.skills = skills or {}
         self.files_written: set[str] = set()
+        self.screenshots = ScreenshotBudget(screenshot_budget)
 
     def run(self, name: str, args: dict) -> ToolOutcome:
         handler = getattr(self, f"_tool_{name}", None)
@@ -382,12 +429,13 @@ class ToolExecutor:
             raise ToolError("width must be between 200 and 3000")
         if scroll_y is not None and scroll_y < 0:
             raise ToolError("scroll_y must be 0 or more")
+        note = self.screenshots.take()
         renderer = self._renderer or render_html_screenshot
         png = renderer(target, width=width, full_page=full_page, scroll_y=scroll_y)
         where = f", scrolled to y={scroll_y}px" if scroll_y is not None else ""
         return [
             image_block_from_bytes(png, "image/png"),
-            {"type": "text", "text": f"Screenshot of {path} at {width}px wide{where}."},
+            {"type": "text", "text": f"Screenshot of {path} at {width}px wide{where}.{note}"},
         ]
 
     def _tool_check_contrast(self, pairs: list[dict]) -> str:

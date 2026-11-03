@@ -15,7 +15,9 @@ subscription. Install Claude Code, run `claude auth login` with your Pro/Max acc
   agent session after the reset (`/usage` in Claude Code shows where you are).
 - **Stretching your plan:** keep `skills.audit: on_change` (the audit only runs when agents, skills
   or upstream versions changed). Use `fast` (Sonnet) for reviewers, as configured. Use one variant
-  at a time. Approve steps promptly rather than re-running them.
+  at a time. Approve steps promptly rather than re-running them. Set `screenshot_budget: N` on an agent
+  to cap its screenshots per turn: the helper warns at N and refuses after 2N (the designer has 10, the
+  coder 12), because screenshots are the most expensive thing agents do.
 - **API keys:** if `ANTHROPIC_API_KEY` is set in your shell, agentflow removes it for Claude Code
   sessions so the subscription is used. `doctor` warns you about it.
 - **Model access:** if your plan doesn't include a model, change the `default` alias in `agentflow.yaml`
@@ -122,6 +124,11 @@ in its handoff notes, and you confirm or change it at the checkpoint.
 Two skills from `anthropics/skills` are set up as examples (`frontend-design`, `theme-factory`,
 both Apache-2.0), plus a local `svg-scroll-animation` skill holding the motion techniques the SVG
 agents use. Replace or extend them with yours.
+
+To change a GitHub skill's instructions, copy it into `skills/local/` under a new name (keep its licence),
+edit the copy and point agents at it, as `frontend-design-agentflow` does (frontend-design without the
+"confirm with the client" step, for the landing designer). Upstream updates then reach that copy only by
+hand: when the skill audit reports one, diff it against your copy.
 
 ### New specialists
 

@@ -18,13 +18,15 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import uuid
 from pathlib import Path
 from typing import Any, Callable
 
 from ..agent import AgentError, AgentResult, Usage, check_handoff, result_from_handoff, system_prompt_for
 from ..config import AgentSpec
-from ..tools import COMPLETE_TASK, schema_for, terminal_tool_for, validate_input
+from ..tools import (COMPLETE_TASK, SCREENSHOT_BUDGET_ENV, SCREENSHOT_COUNTER_ENV, schema_for, terminal_tool_for,
+                     validate_input)
 from ..workspace import Workspace
 
 # Removed from the environment of every `claude` process: with any of these set, Claude Code
@@ -215,6 +217,17 @@ class ClaudeCodeRunner:
             cmd += ["--add-dir", str(skill.root.resolve())]
         return cmd
 
+    def _env(self, scratch: str) -> dict[str, str]:
+        env = subscription_env()
+        env.pop(SCREENSHOT_BUDGET_ENV, None)
+        env.pop(SCREENSHOT_COUNTER_ENV, None)
+        if self.spec.screenshot_budget:
+            # A fresh counter per call, outside the workspace (so the agent can't reset it): each turn
+            # (first attempt, each round of feedback) gets the full budget.
+            env[SCREENSHOT_BUDGET_ENV] = str(self.spec.screenshot_budget)
+            env[SCREENSHOT_COUNTER_ENV] = os.path.join(scratch, "screenshots")
+        return env
+
     def _invoke(self, prompt: str, *, new_session: bool) -> dict:
         if shutil.which(claude_binary()) is None and not Path(claude_binary()).is_file():
             raise AgentError("Claude Code (`claude`) was not found; install it and log in with `claude auth login`")
@@ -223,14 +236,15 @@ class ClaudeCodeRunner:
         self.on_event("tool", agent=self.spec.name, tool="working in Claude Code",
                       args={"path": "(new session)" if new_session else "(same session)"})
         try:
-            proc = subprocess.run(
-                self.command(prompt, new_session=new_session),
-                cwd=self.workspace.root,
-                env=subscription_env(),
-                capture_output=True,
-                text=True,
-                timeout=self.timeout,
-            )
+            with tempfile.TemporaryDirectory(prefix="agentflow-") as scratch:
+                proc = subprocess.run(
+                    self.command(prompt, new_session=new_session),
+                    cwd=self.workspace.root,
+                    env=self._env(scratch),
+                    capture_output=True,
+                    text=True,
+                    timeout=self.timeout,
+                )
         except subprocess.TimeoutExpired as exc:
             raise AgentError(f"{self.spec.name}: Claude Code did not finish within {self.timeout}s") from exc
 

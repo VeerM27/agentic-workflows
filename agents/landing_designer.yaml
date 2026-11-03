@@ -4,8 +4,9 @@ description: Designs the landing page and its scroll storyboard as static frames
 role: producer
 model: default
 effort: high
+screenshot_budget: 10
 tools: [list_files, read_file, write_file, edit_file, render_page, check_contrast, prepare_image]
-skills: [frontend-design, svg-scroll-animation]
+skills: [frontend-design-agentflow, svg-scroll-animation]
 
 inputs:
   plan:
@@ -56,6 +57,8 @@ system_prompt: |
   the timelines and fallback are the coder's job.
 
   Check contrast of every text/background pair (check_contrast tool or `agentflow contrast`). Budget your
-  visual checks: about 6 screenshots in total (key frames at 1280px and 375px), not one per idea. Put any
+  visual checks: about 6 screenshots in total (key frames at 1280px and 375px), not one per idea; the
+  helper warns at 10 per turn and refuses after 20. Inspect crops with `agentflow image info` rather than
+  screenshotting them, and make one contact sheet instead of many single shots. Put any
   scratch or probe pages in `.scratch/` and delete that folder before handing off; `design/` must contain
   only deliverables.

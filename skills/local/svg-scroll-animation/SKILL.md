@@ -32,7 +32,12 @@ description: Techniques and standards for building performant, accessible SVG an
   True path morphing needs identical point counts; avoid it unless you control both paths.
 - **Pinned sequences:** a tall container (e.g. `height: 300vh`) with a `position: sticky` stage;
   drive the stage from `view-timeline` on the container (`view-timeline-name: --story;` then
-  `animation-timeline: --story;`).
+  `animation-timeline: --story;`). The sticky stage and its captions must fit inside `100svh` at every
+  width: size the artwork from the height left after the captions (e.g. `max-height: calc(100svh -
+  <caption block>)` with the aspect ratio kept), never from the width alone, and never rely on
+  `overflow: hidden` to hide what doesn't fit. Check the end state at 1280×800, 1024×768 and 375×553.
+- **Caption and text changes:** text never overlaps text. The outgoing caption is fully transparent before
+  the incoming one starts (leave a small gap in the ranges), in both the CSS timeline and the JS fallback.
 - **Colour shifts:** animate `fill`/`stroke`, or swap palette tokens via custom properties.
 
 ## Standards

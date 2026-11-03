@@ -354,7 +354,7 @@ def test_contrast_command(capsys):
 
 def test_agent_skill_assignments_follow_the_skill_audit():
     agents = load_agents(ROOT / "agents")
-    assert agents["landing_designer"].skills == ["frontend-design", "svg-scroll-animation"]
+    assert agents["landing_designer"].skills == ["frontend-design-agentflow", "svg-scroll-animation"]
     assert agents["planner"].skills == []
     assert agents["landing_coder"].skills == ["svg-scroll-animation", "web-security-checklist", "accessibility-qa-checklist"]
     assert "accessibility-qa-checklist" in agents["page_checker"].skills

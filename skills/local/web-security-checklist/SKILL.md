@@ -5,6 +5,16 @@ description: Security and privacy checklist for static and front-end web pages (
 
 # Web security checklist (front end)
 
+## Builder must-dos (ship these yourself)
+Review steps only report: nothing a reviewer finds is added for you. Whoever builds the page ships:
+- A `<meta http-equiv="Content-Security-Policy">` as the first element after `<meta charset>`, ahead of any
+  script or stylesheet, listing exactly the origins the page uses (see "Policy and headers" below). Check the
+  page still works with it, both from a local server and from `file://` if the plan requires that.
+- `referrerpolicy="no-referrer"` on every external `<link>`, `<script>` and `<img>`, or self-hosted assets
+  instead (preferred for fonts: woff2 under `assets/fonts/` with `@font-face`).
+- In the README, the headers the host must send (CSP with `frame-ancestors`, HSTS, `nosniff`, Referrer-Policy).
+Never write "the security review adds it": it won't.
+
 ## Injection and DOM safety
 - No `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`, `eval`, `new Function`, string
   `setTimeout`/`setInterval` with any data that is not a constant.

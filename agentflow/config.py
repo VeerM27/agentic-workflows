@@ -31,7 +31,7 @@ REVIEW_WORK_ARG = "work"
 REF_PATTERN = re.compile(r"\$\{\s*(inputs|steps)\.([A-Za-z0-9_\-]+)(?:\.([A-Za-z0-9_]+))?\s*\}")
 
 _AGENT_KEYS = {"version", "name", "description", "role", "model", "effort", "max_tokens", "max_turns",
-               "tools", "skills", "inputs", "system_prompt", "instructions"}
+               "tools", "skills", "inputs", "system_prompt", "instructions", "screenshot_budget"}
 _INPUT_KEYS = {"type", "required", "description", "default", "library"}
 _WORKFLOW_KEYS = {"version", "name", "description", "agents_dir", "inputs", "steps", "checkpoints", "preflight"}
 _STEP_KEYS = {"id", "agent", "inputs", "instructions", "review", "skills", "variants", "checkpoint", "fixes"}
@@ -102,6 +102,7 @@ class AgentSpec:
     effort: str | None = None  # None = project default
     max_tokens: int = 64000
     max_turns: int = 40
+    screenshot_budget: int | None = None  # screenshots per turn before a warning; refused at twice this
     tools: list[str] = field(default_factory=list)
     skills: list[str] = field(default_factory=list)
     inputs: dict[str, InputSpec] = field(default_factory=dict)
@@ -199,6 +200,10 @@ def load_agent(path: str | Path) -> AgentSpec:
     if unknown:
         raise ConfigError(f"{where}: unknown tools {unknown} (available: {sorted(AGENT_TOOLS)})")
 
+    budget = data.get("screenshot_budget")
+    if budget is not None and (isinstance(budget, bool) or not isinstance(budget, int) or budget < 1):
+        raise ConfigError(f"{where}: screenshot_budget must be a whole number of 1 or more, got {budget!r}")
+
     inputs = {
         arg: InputSpec.parse(arg, raw, where, AGENT_INPUT_TYPES)
         for arg, raw in (data.get("inputs") or {}).items()
@@ -215,6 +220,7 @@ def load_agent(path: str | Path) -> AgentSpec:
         effort=effort,
         max_tokens=int(data.get("max_tokens", 64000)),
         max_turns=int(data.get("max_turns", 40)),
+        screenshot_budget=budget,
         tools=tools,
         skills=_str_list(data.get("skills"), where, "skills"),
         inputs=inputs,

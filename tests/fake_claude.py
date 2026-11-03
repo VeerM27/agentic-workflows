@@ -37,6 +37,8 @@ def main() -> int:
             "agent": agent, "argv": argv, "cwd": os.getcwd(), "session": session,
             "new_session": "--session-id" in argv, "prompt": opt("-p"),
             "api_key_present": any(os.environ.get(k) for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")),
+            "screenshot_budget": os.environ.get("AGENTFLOW_SCREENSHOT_BUDGET"),
+            "screenshot_counter": os.environ.get("AGENTFLOW_SCREENSHOT_COUNTER"),
         }) + "\n")
 
     script = json.loads(Path(os.environ["FAKE_CLAUDE_SCRIPT"]).read_text())

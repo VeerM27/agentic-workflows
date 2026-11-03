@@ -19,3 +19,8 @@
 
 ## Naming
 - Files and folders in kebab-case. CSS custom properties `--color-*`, `--space-*`, `--radius-*`, `--font-*`.
+
+## Forms without a backend
+- If the brief gives no endpoint, the form is a demo: show it only when JavaScript runs (hide it under
+  `no-js` and show a one-line note instead), never let it submit anywhere, and don't write copy that
+  promises a sign-up ("we'll email you") until a real list exists.

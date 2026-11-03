@@ -154,7 +154,8 @@ class AgentRunner:
         self.terminal = terminal_tool_for(spec.role)
         tool_names = list(spec.tools) + ([SKILL_TOOL] if self.skills else [])
         self.tools = tool_params(tool_names, self.terminal)
-        self.executor = ToolExecutor(workspace, renderer=renderer, skills={s.name: s for s in self.skills})
+        self.executor = ToolExecutor(workspace, renderer=renderer, skills={s.name: s for s in self.skills},
+                                     screenshot_budget=spec.screenshot_budget)
         self.system = system_prompt_for(spec, house_style, self.skills)
         self._tool_names = {t["name"] for t in self.tools}
         self.messages: list[dict] = []
@@ -172,6 +173,7 @@ class AgentRunner:
 
     def follow_up(self, text: str) -> AgentResult:
         """Continue the same conversation with new instructions (e.g. review feedback)."""
+        self.executor.screenshots.used = 0  # each round of feedback gets a fresh screenshot budget
         if not self.messages:
             raise AgentError("agent has not started yet")
         self.messages.append({"role": "user", "content": [{"type": "text", "text": text}]})

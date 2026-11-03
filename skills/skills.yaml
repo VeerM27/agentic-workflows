@@ -19,6 +19,10 @@ skills:
     ref: main
     note: Curated colour/font themes plus on-the-fly theme generation. Used by the palette designer.
 
+  frontend-design-agentflow:
+    local: local/frontend-design-agentflow
+    note: frontend-design without the client-confirmation step. Used by the landing designer; carry upstream updates over by hand.
+
   svg-scroll-animation:
     local: local/svg-scroll-animation
     note: Your own motion techniques and standards. Edit it as your practice evolves.
@@ -29,7 +33,7 @@ skills:
 
   web-security-checklist:
     local: local/web-security-checklist
-    note: Front-end security and privacy checklist. Used by the security reviewer.
+    note: Front-end security and privacy checklist. Used by the coder and the security reviewer.
 
   accessibility-qa-checklist:
     local: local/accessibility-qa-checklist

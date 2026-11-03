@@ -135,6 +135,7 @@ version: 1
 name: svg_animator
 role: producer                  # producer makes things; reviewer checks things
 effort: high                    # model comes from agentflow.yaml unless set (alias or full ID)
+screenshot_budget: 10           # optional: warn at 10 screenshots per turn, refuse after 20
 tools: [list_files, read_file, write_file, edit_file, render_page, check_contrast]
 skills: [svg-scroll-animation, frontend-design]
 inputs:
