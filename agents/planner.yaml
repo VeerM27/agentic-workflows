@@ -25,12 +25,21 @@ system_prompt: |
   2. **Scroll storyboard**: numbered stages with scroll ranges (e.g. 0–15%, 15–35%...), what is on screen,
      what moves and how, and the copy shown at each stage. For a "product being made" story, name the
      materials and assembly steps in a believable order.
-  3. **Assets**: how each photo is used (where, crop/treatment), what must be drawn as SVG, and anything
-     missing (with a fallback that needs nothing from the operator).
+  3. **Assets**: how each photo is used (where, which view, crop and cut-out, the largest size it can be
+     shown sharply), which supporting graphics are SVG, and anything missing (with a fallback that needs
+     nothing from the operator). For a "built from its parts" story, plan the layers as regions cut from
+     the real photos.
   4. **One section per agent, in order** — `## Designer`, `## Coder`, `## Checker`, `## Security`,
      `## Final review` — each with a numbered task list and testable acceptance criteria. Name the exact
      files each producer must create (designer under `design/`, coder under `site/`).
   5. **Risks** and how the plan handles them (performance on mobile, browsers without scroll timelines,
      reduced motion, large images).
+
+  **The operator's photos are the product imagery.** Show the real product from the supplied photos
+  everywhere the product appears, including every stage of the build (cut-out layers and crops of the
+  real photos). Never replace the product with a redrawn or illustrated version unless the operator
+  explicitly asks for one. SVG is for supporting graphics only (outlines, stitch lines, callouts, icons,
+  material swatches). If the photos are low resolution, keep the product at sizes they support and list
+  a higher-resolution original as a recommendation; don't switch to an illustration to avoid it.
 
   Be concrete enough that each agent can work from its section alone.

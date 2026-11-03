@@ -109,7 +109,7 @@ def test_runner_uses_subscription_session_and_resumes(tmp_path, fake_claude):
     # skills: preloaded in the system prompt, folders readable
     system = argv[argv.index("--append-system-prompt") + 1]
     assert "## Skill: svg-scroll-animation" in system
-    assert argv.count("--add-dir") == 2
+    assert argv.count("--add-dir") == len(spec.skills)
     assert runner.transcript()["session_id"] == first["session"]
 
 
@@ -356,7 +356,7 @@ def test_agent_skill_assignments_follow_the_skill_audit():
     agents = load_agents(ROOT / "agents")
     assert agents["landing_designer"].skills == ["frontend-design", "svg-scroll-animation"]
     assert agents["planner"].skills == []
-    assert agents["landing_coder"].skills == ["svg-scroll-animation", "web-security-checklist"]
+    assert agents["landing_coder"].skills == ["svg-scroll-animation", "web-security-checklist", "accessibility-qa-checklist"]
     assert "accessibility-qa-checklist" in agents["page_checker"].skills
     for name in ("landing_coder", "landing_designer", "brief_reviewer", "security_reviewer"):
         assert "prepare_image" in agents[name].tools
@@ -380,3 +380,15 @@ def test_old_run_files_without_cost_still_resume(tmp_path, fake_claude):
     state_path.write_text(json.dumps(state))
     done = Orchestrator.resume(paused.run_dir, project=cc_project(tmp_path), approval_mode="auto", **QUIET)
     assert done.status == "done"
+
+
+def test_makers_keep_the_operators_photos_as_the_product():
+    agents = load_agents(ROOT / "agents")
+    for name in ("planner", "landing_designer", "landing_coder"):
+        prompt = agents[name].system_prompt
+        assert "The operator's photos are the product imagery" in prompt
+        assert "Never replace the product with a redrawn or illustrated version" in prompt
+    assert "never wait to confirm anything with the client" in agents["landing_designer"].system_prompt
+    assert "cut out the plain background of every one" in agents["landing_coder"].system_prompt
+    assert "illustrated product the operator didn't ask for is a major issue" in agents["page_checker"].system_prompt
+    assert "never" in agents["brief_reviewer"].system_prompt and "illustration" in agents["brief_reviewer"].system_prompt

@@ -6,7 +6,7 @@ model: default
 effort: high
 max_turns: 60
 tools: [list_files, read_file, write_file, edit_file, delete_file, render_page, check_contrast, prepare_image]
-skills: [svg-scroll-animation, web-security-checklist]
+skills: [svg-scroll-animation, web-security-checklist, accessibility-qa-checklist]
 
 inputs:
   plan:
@@ -23,17 +23,26 @@ system_prompt: |
   the designs in `design/` faithfully, and build the page in `site/`:
   - `site/index.html` (entry point), `site/styles.css`, `site/scroll.js` (fallback only), `site/assets/`
     (never reference files outside `site/`).
+  - `site/README.md`: how to view it (`agentflow serve <run>` or any static server), how the scroll
+    animation works, and which values to tweak.
 
-  Prepare every photo with the image helper (prepare_image tool or `agentflow image ...`): crop each view you
-  use, cut out plain backgrounds to transparency where the design needs it, then `export` 1× and 2× WebP
-  sizes into `site/assets/` and use the printed `srcset` with sensible `sizes`. Never enlarge a photo; if the
+  **The operator's photos are the product imagery.** Show the real product from the supplied photos
+  everywhere the product appears, including every stage of the build (cut-out layers and crops of the
+  real photos). Never replace the product with a redrawn or illustrated version unless the operator
+  explicitly asks for one. SVG is for supporting graphics only (outlines, stitch lines, callouts, icons,
+  material swatches). If the photos are low resolution, keep the product at sizes they support and list
+  a higher-resolution original as a recommendation; don't switch to an illustration to avoid it.
+
+  Prepare every photo with the image helper (prepare_image tool or `agentflow image ...`): crop each view
+  and each build layer you use, and cut out the plain background of every one (`cutout`) so the product
+  sits on the page without a white box and without blend-mode tricks. Then `export` 1× and 2× WebP sizes
+  into `site/assets/` and use the printed `srcset` with sensible `sizes`. Never enlarge a photo; if the
   source is too small for crisp 2× output, use what it allows and say so in your notes. Exported files have
   their metadata stripped; ship only exported files, never the original uploads.
 
   Follow the web-security-checklist skill as you build (no inline handlers or innerHTML, self-hosted assets,
-  a CSP-compatible structure), so the security review has nothing structural to send back.
-  - `site/README.md`: how to view it (`agentflow serve <run>` or any static server), how the scroll
-    animation works, and which values to tweak.
+  a CSP-compatible structure), and the accessibility-qa-checklist skill (keyboard, focus never hidden behind
+  sticky or fixed bars, short and landscape viewports), so the reviews have nothing structural to send back.
 
   The scroll animation: drive it with CSS scroll-driven animations where supported and the progress-
   variable fallback elsewhere; respect reduced motion; keep everything readable if nothing animates.

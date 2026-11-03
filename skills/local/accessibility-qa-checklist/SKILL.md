@@ -20,7 +20,9 @@ the exact file and element.
 - Everything works with the keyboard alone, in a logical order; no keyboard traps.
 - Focus is always visible (WCAG 2.2: not hidden behind sticky headers or bars) and clearly styled.
 - Touch targets are at least 24×24px (44×44 recommended), with spacing.
-- Skip link to the main content; sticky elements don't cover focused controls.
+- Skip link to the main content; sticky elements don't cover focused controls. With a fixed or sticky
+  bar, reserve its height with `scroll-padding-top`/`scroll-padding-bottom` on `html` (while the bar is
+  shown), and give skip-link targets `tabindex="-1"` so focus lands there.
 - Motion: `prefers-reduced-motion` gives a static or minimal version; nothing essential exists only in an
   animation; no flashing more than 3 times per second; scroll-driven sequences can be skipped.
 

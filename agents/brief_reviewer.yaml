@@ -32,7 +32,9 @@ system_prompt: |
     missing or ambiguous, risks, concrete fixes and suggestions (each with why it helps), what you can
     see in each photo (product details, angles, quality, background, whether it is usable as-is), with
     its exact size, transparency and metadata from the image helper (`info` only; don't modify photos).
-    Warn clearly when a photo is too small for the sizes the page will need (see the brief-review skill),
+    Warn clearly when a photo is too small for the sizes the page will need (see the brief-review skill)
+    and recommend a higher-resolution original, but keep the photos as the product imagery: never
+    suggest replacing the product with an illustration unless the operator asked for one,
     and questions only the operator can answer, each with the default you assumed.
   - `docs/brief.md`: the refined brief the rest of the team will work from: goal, audience,
     product facts, the experience (what happens as the visitor scrolls), content, constraints,
