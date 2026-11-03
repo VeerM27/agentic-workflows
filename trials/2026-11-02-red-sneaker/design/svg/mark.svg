@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 24" aria-hidden="true" focusable="false" class="mark">
-  <!-- Ember Low mark: the low-top profile reduced to two parts, canvas upper on a striped sole. -->
-  <path id="mark-upper" fill="#A5202D" d="M3,15.5 C3,10.5 3.6,7 5.6,4.6 C8.6,8 12.8,8.9 16.6,7.6 C18,4.2 19.4,2 21.6,2 L35.6,11.6 L38,15.5 Z"/>
-  <rect id="mark-sole" x="2" y="15.5" width="37" height="6.5" rx="3" fill="#F7F5F1" stroke="#1F1A1B" stroke-width="1"/>
-  <path id="mark-stripe" d="M6,19 H28" stroke="#1F1A1B" stroke-width="1.4" stroke-linecap="round"/>
-</svg>
